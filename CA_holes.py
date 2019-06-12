@@ -14,35 +14,26 @@ import warnings
 warnings.filterwarnings("ignore")
 from plotter import *
 
-def IC():
-    if mode == 'mono': s = ones([nx,ny,nz])
-    if mode == 'bi':
+def IC(): # sets up the initial conditions
+    # pick a grain size distribution
+    if mode == 'mono': s = ones([nx,ny,nz]) # monodisperse
+    if mode == 'bi': # bidisperse
         s = random.choice([s_m,1],size=[nx,ny,nm])
-    elif mode == 'poly':
+    elif mode == 'poly': # polydisperse
         s_0 = s_m/(1.-s_m) # intermediate calculation
         s = random.rand(nx,ny,nm)
         s = (s + s_0)/(s_0 + 1.) # now between s_m and 1
 
-    if IC_mode == 'random':
+
+    # where particles are in space
+    if IC_mode == 'random': # voids everywhere randomly
         mask = random.rand(nx,ny,nm)<fill
-    elif IC_mode == 'top':
+    elif IC_mode == 'top': # voids at the top
         mask = zeros([nx,ny,nm],dtype=bool)
         mask[:,int(top_fill*ny):,:] = True
-    elif IC_mode == 'full':
+    elif IC_mode == 'full': # completely full
         mask = zeros_like(s,dtype=bool)
-    elif IC_mode == 'slope':
-        mask = zeros_like(s,dtype=bool)
-        mask[:,int(0.7*ny):,:] = True
-        s[Y<(-0.5*X + 0.5)] = -1
-    elif IC_mode == 'column':
-        # mask = zeros_like(s,dtype=bool)
-        mask = random.rand(nx,ny,nm)<fill
-        # mask[:nx//3:,:,:] = True
-        # mask[2*nx//3:,:,:] = True
-        mask[:nx//2-int(ny*aspect_ratio/2.),:,:] = True
-        mask[nx//2+int(ny*aspect_ratio/2.):,:,:] = True
-        # mask[nx//2:nx//2+int(ny*aspect_ratio),:,:] = True
-    elif IC_mode == 'empty':
+    elif IC_mode == 'empty': # completely empty
         mask = ones([nx,ny,nm],dtype=bool)
     s[mask] = nan
     return s
@@ -127,7 +118,7 @@ def move_holes_diff(u,v,s): # Diffusion
 
     return u,v,s
 
-def move_holes(u,v,s):
+def move_holes(u,v,s): # pick between left, up or right
     for j in range(ny-2,-1,-1):
         if internal_geometry: x_loop = arange(nx)[~boundary[:,j]] # don't move apparent voids at boundaries
         else: x_loop = arange(nx)
@@ -222,8 +213,8 @@ def move_holes(u,v,s):
                                 v[i,j] += sqrt(2)
     return u,v,s
 
-def add_temp(u,v,s):
-    if temp_mode == 'hopper': # Remove at central outlet
+def add_temp(u,v,s): # very badly named function to add voids
+    if temp_mode == 'hopper': # Remove at central outlet - use this one
         for i in range(nx//2-half_width,nx//2+half_width+1):
             for k in range(nm):
                 # if random.rand() < Tg:
@@ -355,18 +346,18 @@ internal_geometry = False
 if temp_mode == 'hopper':
     nx = 51
     ny = 2*nx
-    nm = 100
-    cyclic_BC = False
-    theta = 0.
-    mu = float(sys.argv[2])
-    half_width = int(sys.argv[3])
-    IC_mode = 'top'
-    top_fill = 0.7
+    nm = 1 # number of simultaneous simulations
+    cyclic_BC = False #
+    theta = 0. # angle of gravity - keep set to zero
+    mu = float(sys.argv[2]) # friction angle????????
+    half_width = int(sys.argv[3]) # half width of outlet in grid points
+    IC_mode = 'top' # just leave empty space at the top
+    top_fill = 0.7 # how high to fill the container initially
     # IC_mode = 'random'
     # fill = 0.3
-    save_inc = 100
-    refill = True
-    t_f = 200.
+    save_inc = 100 # how often to save
+    refill = True # should particles go back to top or not
+    t_f = 200. # final time
 if temp_mode == 'temperature':
     nx = 21#201
     ny = 5*nx
@@ -515,6 +506,9 @@ if internal_geometry:
     # plt.pcolormesh(x,y,boundary.T)
     # plt.show()
     # sys.exit()
+else:
+    boundary = zeros([nx,ny],dtype=bool)
+
 
 if temp_mode == 'temperature':
     T = inlet_temperature*ones_like(s)
@@ -535,19 +529,19 @@ while t < nt:
     u = zeros_like(u)
     v = zeros_like(v)
 
-    depth = get_depth(s)
+    # depth = get_depth(s)
     s_bar = get_average(s)
     s_inv_bar = get_hyperbolic_average(s)
-    T = update_temperature(s,T,boundary)
+    # T = update_temperature(s,T,boundary) # delete the particles at the bottom of the hopper
 
-    # u,v,s = move_holes(u,v,s)
+    u,v,s = move_holes(u,v,s)
 
-    if t%2 == 0:
-        u,v,s = move_holes_adv(u,v,s)
-        u,v,s = move_holes_diff(u,v,s)
-    else:
-        u,v,s = move_holes_diff(u,v,s)
-        u,v,s = move_holes_adv(u,v,s)
+    # if t%2 == 0:
+    #     u,v,s = move_holes_adv(u,v,s)
+    #     u,v,s = move_holes_diff(u,v,s)
+    # else:
+    #     u,v,s = move_holes_diff(u,v,s)
+    #     u,v,s = move_holes_adv(u,v,s)
 
     u,v,s = add_temp(u,v,s)
     if close: u,v,s = close_voids(u,v,s)
