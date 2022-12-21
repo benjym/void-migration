@@ -25,9 +25,10 @@ jobs:
       - uses: actions/setup-node@v2
       - run: pip install pycco
       - run: pycco void-migration/*.py
+      - run: touch docs/.nojekyll
 
       - name: Deploy to GitHub Pages
         uses: JamesIves/github-pages-deploy-action@v4.2.5
         with:
           branch: gh-pages
-          folder: .
+          folder: docs
