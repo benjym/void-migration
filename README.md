@@ -11,5 +11,8 @@ A python package for simulating the motion of a granular material as a result of
 3.  Install the python package `pip install -r requirements.txt`
 4.  Run the code with `python void-migration/void_migration.py`. Parameters you can adjust are contained at the bottom of that file.
 
+# Documentation
+You can [read the docs here](https://benjym.github.io/void-migration/).
+
 # Authors
 - [Benjy Marks](mailto:benjy.marks@sydney.edu.au)
