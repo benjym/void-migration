@@ -1,4 +1,5 @@
 .DS_Store
 dist/
+docs/
 __pycache__/
 void_migration.egg-info/
