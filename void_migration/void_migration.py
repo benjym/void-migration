@@ -21,16 +21,34 @@ import json5
 
 
 class dict_to_class(dict):
+    """
+    A convenience class to store the information from the parameters dictionary. Used because I prefer using p.variable to p['variable'].
+    """
+
     def __init__(self, dict):
         lists = []
         for key in dict:
             setattr(self, key, dict[key])
             if isinstance(dict[key], list):
                 lists.append(key)
-        setattr(self, 'lists', lists)
+        setattr(self, "lists", lists)
 
 
-def IC(p):  # sets up the initial conditions
+def IC(p):
+    """
+    Sets up the initial value of the grain size and/or void distribution everywhere.
+
+    Parameters
+    ----------
+    p : class
+        Parameters class. In particular, the `gsd_mode` and `IC_mode` should be set to determine the grain size distribution (gsd) and the initial condition (IC).
+
+    Returns
+    -------
+    s : array_like
+        The array of grain sizes. Values of `NaN` are voids.
+    """
+
     # pick a grain size distribution
     if p.gsd_mode == "mono":
         s = np.ones([p.nx, p.ny, p.nm])  # monodisperse
@@ -52,7 +70,9 @@ def IC(p):  # sets up the initial conditions
         mask = np.zeros_like(s, dtype=bool)
     elif p.IC_mode == "column":  # just middle full to top
         mask = np.ones([p.nx, p.ny, p.nm], dtype=bool)
-        mask[p.nx // 2 - int(p.fill_ratio / 2 * p.nx):p.nx // 2 + int(p.fill_ratio / 2 * p.nx), :, :] = False
+        mask[
+            p.nx // 2 - int(p.fill_ratio / 2 * p.nx) : p.nx // 2 + int(p.fill_ratio / 2 * p.nx), :, :
+        ] = False
     elif p.IC_mode == "empty":  # completely empty
         mask = np.ones([p.nx, p.ny, p.nm], dtype=bool)
     s[mask] = np.nan
@@ -60,9 +80,9 @@ def IC(p):  # sets up the initial conditions
 
 
 def move_voids_adv(u, v, s, c, T, boundary):  # Advection
-    '''
+    """
     Deprecated function. Do not use.
-    '''
+    """
     for j in range(p.ny - 2, -1, -1):
         x_loop = np.arange(p.nx)
         if p.internal_geometry:
@@ -83,9 +103,9 @@ def move_voids_adv(u, v, s, c, T, boundary):  # Advection
 
 
 def move_voids_diff(u, v, s, c, T, boundary):  # Diffusion
-    '''
+    """
     Deprecated function. Do not use.
-    '''
+    """
     for j in range(p.ny - 2, -1, -1):
         x_loop = np.arange(p.nx)
         if p.internal_geometry:
@@ -165,16 +185,22 @@ def move_voids_diff(u, v, s, c, T, boundary):  # Diffusion
                                     s[i, j, k],
                                     s[i + 1, j, k],
                                     (1 - np.sin(np.radians(p.theta)))
-                                    / (1 - np.sin(np.radians(p.theta)) + (1 + np.sin(np.radians(p.theta))) * (l / r)),
+                                    / (
+                                        1
+                                        - np.sin(np.radians(p.theta))
+                                        + (1 + np.sin(np.radians(p.theta))) * (l / r)
+                                    ),
                                 )
                                 # if not np.isnan(s[i+lr,j+1,k]): # this sets the angle of repose at 45
                                 # if np.mean(np.isnan(s[i, j, :])) > 0.5:  # if here is mostly empty (ie outside mass)
                                 # print('outside')
                                 if p.mu < 1:
-                                    A = p.mu / 2.  # proportion of cell that should be filled diagonally up
+                                    A = p.mu / 2.0  # proportion of cell that should be filled diagonally up
                                 else:
-                                    A = 1. - 1. / (2. * p.mu)
-                                if np.mean(~np.isnan(s[i + lr, j + 1, :])) > A:  # this sets an angle of repose?
+                                    A = 1.0 - 1.0 / (2.0 * p.mu)
+                                if (
+                                    np.mean(~np.isnan(s[i + lr, j + 1, :])) > A
+                                ):  # this sets an angle of repose?
                                     s[i, j, k], s[i + lr, j, k] = s[i + lr, j, k], s[i, j, k]
                                     u[i, j] -= lr
                                     if T is not None:
@@ -218,14 +244,13 @@ def move_voids(u, v, s, diag=0, c=None, T=None, boundary=None):  # pick between 
     v : array_like
     s : array_like
     c : array_like or None
-    T : array_like or None
-"""
+    T : array_like or None"""
 
     # WHERE THE HELL DID THIS COME FROM???
     if p.mu < 1:
-        A = p.mu / 2.  # proportion of cell that should be filled diagonally up
+        A = p.mu / 2.0  # proportion of cell that should be filled diagonally up
     else:
-        A = 1. - 1. / (2. * p.mu)
+        A = 1.0 - 1.0 / (2.0 * p.mu)
     # print(A)
     # A = 0.01
 
@@ -255,7 +280,7 @@ def move_voids(u, v, s, diag=0, c=None, T=None, boundary=None):  # pick between 
                         else:
                             P_l = (0.5 + 0.5 * np.sin(np.radians(p.theta))) / s[i - 1, j + diag, k]
 
-                        if hasattr(p, 'internal_geometry'):
+                        if hasattr(p, "internal_geometry"):
                             if boundary[i - 1, j + diag]:
                                 P_l *= p.internal_geometry["perf_rate"]
                         # if perf_plate and i-1==perf_pts[0]: P_l *= perf_rate
@@ -344,7 +369,12 @@ def add_voids(u, v, s, c, outlet):
                 # if np.random.rand() < Tg:
                 if not np.isnan(s[i, 0, k]):
                     if p.refill:
-                        if np.sum(np.isnan(s[p.nx // 2 - p.half_width : p.nx // 2 + p.half_width + 1, -1, k])) > 0:
+                        if (
+                            np.sum(
+                                np.isnan(s[p.nx // 2 - p.half_width : p.nx // 2 + p.half_width + 1, -1, k])
+                            )
+                            > 0
+                        ):
                             target = np.random.choice(np.nonzero(np.isnan(s[:, -1, k]))[0])
                             s[target, -1, k], s[i, 0, k] = s[i, 0, k], s[target, -1, k]
                     else:
@@ -439,6 +469,9 @@ def add_voids(u, v, s, c, outlet):
 
 
 def close_voids(u, v, s):
+    """
+    Not implemented. Do not use.
+    """
     for i in range(p.nx):
         for j in np.arange(p.ny - 1, -1, -1):  # go from top to bottom
             for k in range(p.nm):
@@ -451,14 +484,20 @@ def close_voids(u, v, s):
 
 
 def update_temperature(s, T, boundary):
-    T[np.isnan(s)] = p.temperature['inlet_temperature']  # HACK
-    T[boundary] = p.temperature['boundary_temperature']
+    """
+    Used for modelling the diffusion of heat into the body. Still not functional. Do not use.
+    """
+    T[np.isnan(s)] = p.temperature["inlet_temperature"]  # HACK
+    T[boundary] = p.temperature["boundary_temperature"]
     T_inc = np.zeros_like(T)
     T_inc[1:-1, 1:-1] = 1e-3 * (T[2:, 1:-1] + T[:-2, 1:-1] + T[1:-1, 2:] + T[1:-1, :-2] - 4 * T[1:-1, 1:-1])
     return T + T_inc
 
 
 def get_average(s):
+    """
+    Calculate the mean size over the microstructural co-ordinate.
+    """
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", category=RuntimeWarning)
         s_bar = np.nanmean(np.nanmean(s, 2), 0)
@@ -466,16 +505,27 @@ def get_average(s):
 
 
 def get_hyperbolic_average(s):
-    s_inv_bar = 1.0 / np.nanmean(1.0 / s, 2)
+    """
+    Calculate the hyperbolic mean size over the microstructural co-ordinate.
+    """
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", category=RuntimeWarning)
+        s_inv_bar = 1.0 / np.nanmean(1.0 / s, 2)
     return s_inv_bar
 
 
 def get_depth(s):
+    """
+    Unused.
+    """
     depth = np.mean(np.mean(~np.isnan(s), axis=2), axis=1)
     return depth
 
 
 def time_march(p):
+    """
+    Run the actual simulation(s) as defined in the input json file `p`.
+    """
     # nx = 20
     # ny = 20  # 200
     # nm = 20
@@ -657,7 +707,7 @@ def time_march(p):
         boundary = np.zeros([p.nx, p.ny], dtype=bool)
 
     if hasattr(p, "temperature"):
-        T = p.temperature['inlet_temperature'] * np.ones_like(s)
+        T = p.temperature["inlet_temperature"] * np.ones_like(s)
         T[np.isnan(s)] = np.nan
         outlet_T = []
     else:
@@ -669,7 +719,16 @@ def time_march(p):
     if hasattr(p, "concentration"):
         plotter.plot_c(x, y, s, c, p.folderName, t, p.internal_geometry)
     if hasattr(p, "temperature"):
-        plotter.plot_T(x, y, s, T, p.folderName, t, p.temperature["boundary_temperature"], p.temperature["inlet_temperature"])
+        plotter.plot_T(
+            x,
+            y,
+            s,
+            T,
+            p.folderName,
+            t,
+            p.temperature["boundary_temperature"],
+            p.temperature["inlet_temperature"],
+        )
     outlet = []
 
     # print("Running " + p.folderName)
@@ -709,7 +768,16 @@ def time_march(p):
             if hasattr(p, "save_outlet"):
                 np.savetxt(p.folderName + "outlet.csv", np.array(outlet), delimiter=",")
             if hasattr(p, "temperature"):
-                plotter.plot_T(x, y, s, T, p.folderName, t, p.temperature["boundary_temperature"], p.temperature["inlet_temperature"])
+                plotter.plot_T(
+                    x,
+                    y,
+                    s,
+                    T,
+                    p.folderName,
+                    t,
+                    p.temperature["boundary_temperature"],
+                    p.temperature["inlet_temperature"],
+                )
                 np.savetxt(p.folderName + "outlet_T.csv", np.array(outlet_T), delimiter=",")
             if hasattr(p, "save_velocity"):
                 np.savetxt(p.folderName + "u.csv", u / np.sum(np.isnan(s), axis=2), delimiter=",")
@@ -739,17 +807,19 @@ def time_march(p):
         plotter.plot_profile(x, nu_time_x, p.folderName, nt, p.t_f)
 
 
-if __name__ == '__main__':
-    with open(sys.argv[1], 'r') as params:
+if __name__ == "__main__":
+    with open(sys.argv[1], "r") as params:
         # parse file
         dict = json5.loads(params.read())
-        dict['input_filename'] = (sys.argv[1].split('/')[-1]).split('.')[0]
+        dict["input_filename"] = (sys.argv[1].split("/")[-1]).split(".")[0]
         p_init = dict_to_class(dict)
 
         for i in tqdm(p_init.mu, desc="Friction angle", disable=(len(p_init.mu) == 1)):
-            for j in tqdm(p_init.half_width, desc="Half width", leave=False, disable=(len(p_init.half_width) == 1)):
+            for j in tqdm(
+                p_init.half_width, desc="Half width", leave=False, disable=(len(p_init.half_width) == 1)
+            ):
                 p = dict_to_class(dict)
                 p.mu = i
                 p.half_width = j
-                p.folderName = f'output/{p.input_filename}/mu_{i}/half_width_{j}/'
+                p.folderName = f"output/{p.input_filename}/mu_{i}/half_width_{j}/"
                 time_march(p)

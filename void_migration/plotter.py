@@ -83,9 +83,7 @@ def plot_s(x, y, s, folderName, t, internal_geometry, s_m):
     plt.savefig(folderName + "s_" + str(t).zfill(6) + ".png", dpi=100)
 
 
-def plot_nu(
-    x, y, s, folderName, t, internal_geometry, boundary=False
-):
+def plot_nu(x, y, s, folderName, t, internal_geometry, boundary=False):
     nu = 1 - np.mean(np.isnan(s), axis=2).T
     if internal_geometry:
         nu = np.ma.masked_where(boundary.T, nu)
