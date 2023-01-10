@@ -17,15 +17,17 @@ from tqdm import tqdm
 import warnings
 import json5
 
+from numpy.typing import ArrayLike
+
 # warnings.filterwarnings("ignore")
 
 
-class dict_to_class(dict):
+class dict_to_class:
     """
     A convenience class to store the information from the parameters dictionary. Used because I prefer using p.variable to p['variable'].
     """
 
-    def __init__(self, dict):
+    def __init__(self, dict: dict):
         lists = []
         for key in dict:
             setattr(self, key, dict[key])
@@ -213,7 +215,15 @@ def move_voids_diff(u, v, s, c, T, boundary):  # Diffusion
     return u, v, s, c, T
 
 
-def move_voids(u, v, s, diag=0, c=None, T=None, boundary=None):  # pick between left, up or right
+def move_voids(
+    u: ArrayLike,
+    v: ArrayLike,
+    s: ArrayLike,
+    diag: int = 0,
+    c: None | ArrayLike = None,
+    T: None | ArrayLike = None,
+    boundary: None | ArrayLike = None,
+) -> tuple[ArrayLike, ArrayLike, ArrayLike, None | ArrayLike, None | ArrayLike]:
     """
     Function to move voids each timestep.
 
@@ -221,10 +231,10 @@ def move_voids(u, v, s, diag=0, c=None, T=None, boundary=None):  # pick between 
         u: Storage container for counting how many voids moved horizontally
         v: Storage container for counting how many voids moved vertically
         s: 3D array containing the local sizes everywhere. `NaN`s represent voids. Other values represent the grain size. The first two dimensions represent real space, the third dimension represents the micro-structural coordinate.
-        diag: Should the voids swap horizontally (von neumnann neighbourhood, `diag=0) or diagonally upwards (moore neighbourhood, `diag=1`). Default value `0`.
-        c: If array_like, a storage container for tracking motion of differently labelled particles. If `None`, do nothing.
-        T: If array_like, the temperature field. If `None`, do nothing.
-        boundary: If array_like, a descriptor of cells which voids cannot move into (i.e. boundaries). If `internal_boundary` is defined in the params file, allow for reduced movement rates rather than zero. If `None`, do nothing.
+        diag: Should the voids swap horizontally (von neumnann neighbourhood, `diag=0`) or diagonally upwards (moore neighbourhood, `diag=1`). Default value `0`.
+        c: If ArrayLike, a storage container for tracking motion of differently labelled particles. If `None`, do nothing.
+        T: If ArrayLike, the temperature field. If `None`, do nothing.
+        boundary: If ArrayLike, a descriptor of cells which voids cannot move into (i.e. boundaries). If `internal_boundary` is defined in the params file, allow for reduced movement rates rather than zero. If `None`, do nothing.
 
     Returns:
         u: The updated horizontal velocity
