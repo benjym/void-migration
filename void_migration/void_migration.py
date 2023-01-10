@@ -38,14 +38,10 @@ def IC(p):
     """
     Sets up the initial value of the grain size and/or void distribution everywhere.
 
-    Parameters
-    ----------
-    p : class
-        Parameters class. In particular, the `gsd_mode` and `IC_mode` should be set to determine the grain size distribution (gsd) and the initial condition (IC).
+    Args:
+        p: Parameters class. In particular, the `gsd_mode` and `IC_mode` should be set to determine the grain size distribution (gsd) and the initial condition (IC).
 
-    Returns
-    -------
-    s : array_like
+    Returns:
         The array of grain sizes. Values of `NaN` are voids.
     """
 
@@ -221,30 +217,22 @@ def move_voids(u, v, s, diag=0, c=None, T=None, boundary=None):  # pick between 
     """
     Function to move voids each timestep.
 
-    Parameters
-    ----------
-    u : array_like
-        Storage container for counting how many voids moved horizontally
-    v : array_like
-        Storage container for counting how many voids moved vertically
-    s : array_like
-        The local sizes everywhere. `NaN`s represent voids. Other values represent the grain size.
-    diag : 0 or 1, optional
-        Should the voids swap horizontally (von neumnann neighbourhood, `diag=0) or diagonally upwards (moore neighbourhood, `diag=1`). Default value `0`.
-    c : array_like or None
-        If array_like, a storage container for tracking motion of differently labelled particles. If `None`, do nothing.
-    T : array_like or None
-        If array_like, the temperature field. If `None`, do nothing.
-    boundary: array_like or None
-        If array_like, a descriptor of cells which voids cannot move into (i.e. boundaries). If `internal_boundary` is defined in the params file, allow for reduced movement rates rather than zero. If `None`, do nothing.
+    Args:
+        u: Storage container for counting how many voids moved horizontally
+        v: Storage container for counting how many voids moved vertically
+        s: 3D array containing the local sizes everywhere. `NaN`s represent voids. Other values represent the grain size. The first two dimensions represent real space, the third dimension represents the micro-structural coordinate.
+        diag: Should the voids swap horizontally (von neumnann neighbourhood, `diag=0) or diagonally upwards (moore neighbourhood, `diag=1`). Default value `0`.
+        c: If array_like, a storage container for tracking motion of differently labelled particles. If `None`, do nothing.
+        T: If array_like, the temperature field. If `None`, do nothing.
+        boundary: If array_like, a descriptor of cells which voids cannot move into (i.e. boundaries). If `internal_boundary` is defined in the params file, allow for reduced movement rates rather than zero. If `None`, do nothing.
 
-    Returns
-    -------
-    u : array_like
-    v : array_like
-    s : array_like
-    c : array_like or None
-    T : array_like or None"""
+    Returns:
+        u: The updated horizontal velocity
+        v: The updated vertical velocity
+        s: The new locations of the grains
+        c: The updated concentration field
+        T: The updated temperature field
+    """
 
     # WHERE THE HELL DID THIS COME FROM???
     if p.mu < 1:
