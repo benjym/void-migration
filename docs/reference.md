@@ -1,7 +1,7 @@
 # Reference
 
 ## Main functions
-::: voidmigration.voidmigration
+::: void_migration.void_migration
 
 ## Plotting
-::: voidmigration.plotter
+::: void_migration.plotter
