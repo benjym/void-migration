@@ -23,12 +23,17 @@ jobs:
       # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
       - uses: actions/checkout@v2
       - uses: actions/setup-node@v2
-      - run: pip install pycco
-      - run: pycco void-migration/*.py
-      - run: touch docs/.nojekyll
+      # - run: pip install pycco
+      # - run: pycco void-migration/*.py
+      # - run: touch docs/.nojekyll
+      - run: pip install mkdocs
+      - run: pip install "mkdocstrings[python]"
+      - run: pip install mkdocs-material
+      - run: mkdocs build
 
       - name: Deploy to GitHub Pages
         uses: JamesIves/github-pages-deploy-action@v4.2.5
         with:
           branch: gh-pages
-          folder: docs
+          # folder: docs
+          folder: site
