@@ -26,9 +26,8 @@ jobs:
       # - run: pip install pycco
       # - run: pycco void-migration/*.py
       # - run: touch docs/.nojekyll
-      - run: pip install mkdocs
-      - run: pip install "mkdocstrings[python]"
-      - run: pip install mkdocs-material
+      - run: pip install numpy matplotlib tqdm json5
+      - run: pip install mkdocs "mkdocstrings[python]" mkdocs-material
       - run: mkdocs build
 
       - name: Deploy to GitHub Pages
