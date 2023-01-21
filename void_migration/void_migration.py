@@ -273,7 +273,7 @@ def move_voids(
 
                     # LEFT
                     if i > 0:
-                        if np.isnan(s[i - 1, j + diag, k]) or np.mean(np.isnan(s[i - 1, j + 1, :])) > A:
+                        if np.isnan(s[i - 1, j + diag, k]):  # or np.mean(np.isnan(s[i - 1, j + 1, :])) > A:
                             P_l = 0  # P_r + P_l = 1 at s=1
                         else:
                             P_l = (0.5 + 0.5 * np.sin(np.radians(p.theta))) / s[i - 1, j + diag, k]
@@ -294,7 +294,7 @@ def move_voids(
                     # RIGHT
                     if i + 1 < p.nx:
                         # if ( not np.isnan(s[i+1,j,k]) and not np.isnan(s[i+1,j+1,k]) ): # RIGHT
-                        if np.isnan(s[i + 1, j + diag, k]) or np.mean(np.isnan(s[i + 1, j + 1, :])) > A:
+                        if np.isnan(s[i + 1, j + diag, k]):  # or np.mean(np.isnan(s[i + 1, j + 1, :])) > A:
                             P_r = 0
                         else:
                             P_r = (0.5 - 0.5 * np.sin(np.radians(p.theta))) / s[i + 1, j + diag, k]
@@ -318,28 +318,16 @@ def move_voids(
                         P = np.random.rand()
                         if P < P_u / P_tot and P_u > 0:  # go up
                             dest = [i, j + 1, k]
-                            # s[i, j, k], s[i, j + 1, k] = s[i, j + 1, k], s[i, j, k]
-                            # if c is not None:
-                            #     c[i, j, k], c[i, j + 1, k] = c[i, j + 1, k], c[i, j, k]
-                            # if T is not None:
-                            #     T[i, j, k], T[i, j + 1, k] = T[i, j + 1, k], T[i, j, k]
                             v[i, j] += 1
                         elif P < (P_l + P_u) / P_tot:  # go left
-                            # print(np.mean(~np.isnan(s[i - 1, j + 1, :])) > A)
-                            # if np.mean(~np.isnan(s[i - 1, j + 1, :])) > A:  # * (np.mean(np.isnan(s[i, j, :])) < 0.5):  # if here is mostly empty (ie outside mass) --- this sets the angle of repose
                             dest = [i - 1, j + diag, k]
-                            # s[i, j, k], s[i - 1, j + diag, k] = s[i - 1, j + diag, k], s[i, j, k]
-                            # if c is not None:
-                            #     c[i, j, k], c[i - 1, j + diag, k] = c[i - 1, j + diag, k], c[i, j, k]
-                            # if T is not None:
-                            #     T[i, j, k], T[i - 1, j + diag, k] = T[i - 1, j + diag, k], T[i, j, k]
                             if diag == 0:
                                 u[i, j] += 1  # LEFT
                                 v[i, j] += 1
                             else:
                                 u[i, j] += np.sqrt(2)  # UP LEFT
                                 v[i, j] += np.sqrt(2)
-                        elif P < (P_l + P_u + P_r) / P_tot:  # go right
+                        else:  # go right
                             if i + 1 < p.nx:
                                 dest = [i + 1, j + diag, k]  # not a boundary
                             else:
@@ -352,12 +340,26 @@ def move_voids(
                                 u[i, j] -= np.sqrt(2)  # UP RIGHT
                                 v[i, j] += np.sqrt(2)
 
-                        s[i, j, k], s[*dest] = s[*dest], s[i, j, k]
-                        if c is not None:
-                            c[i, j, k], c[*dest] = c[*dest], c[i, j, k]
-                        if T is not None:
-                            T[i, j, k], T[*dest] = T[*dest], T[i, j, k]
+                        # more than critical void threshold, we are a gas
+                        # if np.mean(np.isnan(s[i, j, :])) > (1 - p.min_solid_density):
+                        #     # print("aa")
+                        #     s, c, T = swap([i, j, k], [i, j + 1, k], [s, c, T])
+                        # else:
+                        #     if (
+                        #         np.mean(np.isnan(s[dest[0], j + 1, :])) < A
+                        #     ):  # only swap in if there is support?
+                        s, c, T = swap([i, j, k], dest, [s, c, T])
+                        # u[i,j] += dest[0] - i
+                        # v[i,j] += dest[1] - j
+
     return u, v, s, c, T
+
+
+def swap(src, dest, arrays):
+    for n in range(len(arrays)):
+        if arrays[n] is not None:
+            arrays[n][*src], arrays[n][*dest] = arrays[n][*dest], arrays[n][*src]
+    return arrays
 
 
 def add_voids(u, v, s, c, outlet):
@@ -524,109 +526,7 @@ def time_march(p):
     """
     Run the actual simulation(s) as defined in the input json file `p`.
     """
-    # nx = 20
-    # ny = 20  # 200
-    # nm = 20
-    # t_f = 2  # final time (s)
-    # CFL = 0.2  # stability criteria, < 0.5
-    # theta = 0.0
-    # H = 0.1  # m
-    # # s_M = 1e-3  # maximum particle size (m)
-    # g = 9.81  # m/s^2
-    # mode = "bi"
-    # # mode = 'poly'
-    # # close = True
-    # close = False
-    # if mode == "bi":
-    #     s_m = 0.1
-    # elif mode == "poly":
-    #     s_m = 0.2  # minimum size
 
-    # temp_mode = sys.argv[1]
-    # perf_plate = False
-    # perf_pts = None
-    # refill = False
-    # internal_geometry = False
-
-    # elif temp_mode == "WGCP":
-    #     cyclic_BC = False
-    #     perf_plate = True
-    #     perf_rate = 0.01  # drop in probability across perf plate
-    #     source_pts = [nx // 6, nx // 2, 5 * nx // 6]
-    #     perf_pts = [nx // 3, 2 * nx // 3]
-    #     # u_applied = zeros_like(y)
-    #     Tg_l = 0.01
-    #     Tg_m = Tg_l / 2.0
-    #     Tg_r = Tg_l / 10.0
-    #     Tg = [Tg_l, Tg_m, Tg_r]
-    #     gamma_dot = 0.0
-    #     half_width = 3
-    #     IC_mode = "top"
-    #     top_fill = 0.7
-    #     save_inc = 10
-    #     mu = float(sys.argv[2])
-    # elif temp_mode == "slope":
-    #     cyclic_BC = True
-    #     mu = float(sys.argv[2])
-    #     theta = float(sys.argv[3])
-    #     Tg = float(sys.argv[4])
-    #     ny = int(sys.argv[5])
-    #     nm = 20
-    #     nx = 5
-    #     IC_mode = "random"
-    #     fill = 0.2
-    #     save_inc = 10000
-    #     t_f = 10.0  # s
-    # elif temp_mode == "mara":
-    #     cyclic_BC = True
-    #     mu = float(sys.argv[2])
-    #     theta = 0.0
-    #     Tg = float(sys.argv[3])
-    #     IC_mode = "top"
-    #     top_fill = 0.5
-    #     ny = 50
-    #     nx = ny * 4
-    #     nm = 5
-    #     save_inc = 10
-    #     t_f = 20.0  # s
-    # elif temp_mode == "pour":
-    #     cyclic_BC = False
-    #     mu = float(sys.argv[2])
-    #     half_width = int(sys.argv[3])
-    #     theta = 0.0
-    #     # Tg = float(sys.argv[4])
-    #     fill = 0.0
-    #     ny = 100
-    #     nx = 50
-    #     nm = 1
-    #     IC_mode = "empty"
-    #     save_inc = 1000
-    #     t_f = 20.0  # s
-
-    # if temp_mode == "WGCP":
-    #     folderName = "plots/" + temp_mode + "/" + mode + "/" + str(Tg_l) + "/"
-    # elif temp_mode == "hopper":
-    #     folderName = "plots/" + temp_mode + "/mu_" + str(mu) + "/D_" + str(half_width) + "/"
-    # elif temp_mode == "slope":
-    #     folderName = (
-    #         "plots/"
-    #         + temp_mode
-    #         + "/"
-    #         + mode
-    #         + "/mu_"
-    #         + str(mu)
-    #         + "/theta_"
-    #         + str(theta)
-    #         + "/Tg_"
-    #         + str(Tg)
-    #         + "/ny_"
-    #         + str(ny)
-    #         + "/"
-    #     )
-    # elif temp_mode == "mara":
-    #     folderName = "plots/" + temp_mode + "/mu_" + str(mu) + "/Tg_" + str(Tg) + "/"
-    # else:
-    #     folderName = "plots/" + temp_mode + "/mu_" + str(mu) + "/"
     if not os.path.exists(p.folderName):
         os.makedirs(p.folderName)
     if not hasattr(p, "internal_geometry"):
@@ -641,7 +541,10 @@ def time_march(p):
         p.close_voids = False
     if not hasattr(p, "diag"):
         p.diag = 0
+    if not hasattr(p, "min_solid_density"):
+        p.min_solid_density = 0.5
 
+    plotter.set_plot_size(p)
     # fig = plt.figure(figsize=[nx / 10., ny / 10.])
     y = np.linspace(0, p.H, p.ny)
     p.dy = y[1] - y[0]

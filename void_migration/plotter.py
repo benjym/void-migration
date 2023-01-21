@@ -31,6 +31,11 @@ bwr = cm.get_cmap("bwr")
 bwr.set_bad("k", 1.0)
 
 
+def set_plot_size(p):
+    dpi = 20
+    fig = plt.figure(figsize=[p.nx / dpi, p.ny / dpi])
+
+
 def plot_u_time(y, U, nu_time, folderName, nt):
     U = np.ma.masked_where(nu_time < 0.2, U)
     U = np.amax(U) - U

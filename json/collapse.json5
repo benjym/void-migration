@@ -11,10 +11,11 @@
     add_voids : "None",
 
     // material properties
-    // mu : [0.5,1.0,2.0],
-    mu : [10.0,1.0,0.1],  // friction angle????????
+    mu : [0.5,1.0,2.0], // friction angle
+    // mu : [10.0,1.0,0.1],  // friction angle????????
     theta : 0.0,
     gsd_mode : 'mono',
+    // diag: 1,
     // Tg : float(sys.argv[4]),
     
     // initial condition:
