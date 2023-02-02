@@ -16,6 +16,7 @@ import numpy as np
 from tqdm import tqdm
 import warnings
 import json5
+from itertools import product
 
 from numpy.typing import ArrayLike
 
@@ -28,12 +29,15 @@ class dict_to_class:
     """
 
     def __init__(self, dict: dict):
+        list_keys = []
         lists = []
         for key in dict:
             setattr(self, key, dict[key])
             if isinstance(dict[key], list):
-                lists.append(key)
+                list_keys.append(key)
+                lists.append(dict[key])
         setattr(self, "lists", lists)
+        setattr(self, "list_keys", list_keys)
 
 
 def IC(p):
@@ -715,12 +719,28 @@ if __name__ == "__main__":
         dict["input_filename"] = (sys.argv[1].split("/")[-1]).split(".")[0]
         p_init = dict_to_class(dict)
 
-        for i in tqdm(p_init.mu, desc="Friction angle", disable=(len(p_init.mu) == 1)):
-            for j in tqdm(
-                p_init.half_width, desc="Half width", leave=False, disable=(len(p_init.half_width) == 1)
-            ):
-                p = dict_to_class(dict)
-                p.mu = i
-                p.half_width = j
-                p.folderName = f"output/{p.input_filename}/mu_{i}/half_width_{j}/"
-                time_march(p)
+        all_tests = product(*p_init.lists)
+        for test in all_tests:
+            folderName = f"output/{dict['input_filename']}/"
+            dict_copy = dict.copy()
+            for i,key in enumerate(p_init.list_keys):
+                print(key, test[i])
+                dict_copy[key] = test[i]
+                folderName += f"{key}_{test[i]}/"
+            p = dict_to_class(dict_copy)
+            p.folderName = folderName
+            # print(p.mu)
+            time_march(p)
+
+
+
+        # for i in tqdm(p_init.mu, desc="Friction angle", disable=(len(p_init.mu) == 1)):
+        #     p.foldername += f"mu_{i}/"
+        #     for j in tqdm(
+        #         p_init.half_width, desc="Half width", leave=False, disable=(len(p_init.half_width) == 1)
+        #     ):
+        #         p = dict_to_class(dict)
+        #         p.mu = i
+        #         p.half_width = j
+        #         p.folderName = f"output/{p.input_filename}/mu_{i}/half_width_{j}/"
+        #         time_march(p)
