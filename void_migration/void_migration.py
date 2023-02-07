@@ -77,11 +77,13 @@ def IC(p):
         ] = False
     elif p.IC_mode == "empty":  # completely empty
         mask = np.ones([p.nx, p.ny, p.nm], dtype=bool)
+
     s[mask] = np.nan
+    
     return s
 
 
-def move_voids_adv(u, v, s, c, T, boundary):  # Advection
+def move_voids_adv(u, v, s, c, T, p):  # Advection
     """
     Deprecated function. Do not use.
     """
@@ -104,14 +106,14 @@ def move_voids_adv(u, v, s, c, T, boundary):  # Advection
     return u, v, s, c, T
 
 
-def move_voids_diff(u, v, s, c, T, boundary):  # Diffusion
+def move_voids_diff(u, v, s, c, T, p):  # Diffusion
     """
     Deprecated function. Do not use.
     """
     for j in range(p.ny - 2, -1, -1):
         x_loop = np.arange(p.nx)
         if p.internal_geometry:
-            x_loop = x_loop[~boundary[:, j]]  # don't move apparent voids at boundaries
+            x_loop = x_loop[~p.boundary[:, j]]  # don't move apparent voids at boundaries
         np.random.shuffle(x_loop)
         for i in x_loop:
             for k in range(p.nm):
@@ -141,11 +143,11 @@ def move_voids_diff(u, v, s, c, T, boundary):  # Diffusion
                             else:
                                 lr = -1
                         else:
-                            if boundary[i - 1, j]:
+                            if p.boundary[i - 1, j]:
                                 l = 1e10  # zero chance of moving there
                             else:
                                 l = s[i - 1, j, k]
-                            if boundary[i + 1, j]:
+                            if p.boundary[i + 1, j]:
                                 r = 1e10  # zero chance of moving there
                             else:
                                 r = s[i + 1, j, k]
@@ -223,10 +225,10 @@ def move_voids(
     u: ArrayLike,
     v: ArrayLike,
     s: ArrayLike,
+    p : dict_to_class,
     diag: int = 0,
     c: None | ArrayLike = None,
     T: None | ArrayLike = None,
-    boundary: None | ArrayLike = None,
 ) -> tuple[ArrayLike, ArrayLike, ArrayLike, None | ArrayLike, None | ArrayLike]:
     """
     Function to move voids each timestep.
@@ -258,7 +260,7 @@ def move_voids(
 
     for j in range(p.ny - 2, -1, -1):
         if p.internal_geometry:
-            x_loop = np.arange(p.nx)[~boundary[:, j]]  # don't move apparent voids at boundaries
+            x_loop = np.arange(p.nx)[~p.boundary[:, j]]  # don't move apparent voids at boundaries
         else:
             x_loop = np.arange(p.nx)
         np.random.shuffle(x_loop)
@@ -283,7 +285,7 @@ def move_voids(
                             P_l = (0.5 + 0.5 * np.sin(np.radians(p.theta))) / s[i - 1, j + diag, k]
 
                         if hasattr(p, "internal_geometry"):
-                            if boundary[i - 1, j + diag]:
+                            if p.boundary[i - 1, j + diag]:
                                 P_l *= p.internal_geometry["perf_rate"]
                         # if perf_plate and i-1==perf_pts[0]: P_l *= perf_rate
                         # if perf_plate and i-1==perf_pts[1]: P_l *= perf_rate
@@ -304,7 +306,7 @@ def move_voids(
                             P_r = (0.5 - 0.5 * np.sin(np.radians(p.theta))) / s[i + 1, j + diag, k]
 
                         if p.internal_geometry:
-                            if boundary[i + 1, j + diag]:
+                            if p.boundary[i + 1, j + diag]:
                                 P_r *= p.internal_geometry["perf_rate"]
                         # if perf_plate and i+1==perf_pts[0]: P_r *= perf_rate
                         # if perf_plate and i+1==perf_pts[1]: P_r *= perf_rate
@@ -487,12 +489,12 @@ def close_voids(u, v, s):
     return u, v, s
 
 
-def update_temperature(s, T, boundary):
+def update_temperature(s, T, p):
     """
     Used for modelling the diffusion of heat into the body. Still not functional. Do not use.
     """
     T[np.isnan(s)] = p.temperature["inlet_temperature"]  # HACK
-    T[boundary] = p.temperature["boundary_temperature"]
+    T[p.boundary] = p.temperature["boundary_temperature"]
     T_inc = np.zeros_like(T)
     T_inc[1:-1, 1:-1] = 1e-3 * (T[2:, 1:-1] + T[:-2, 1:-1] + T[1:-1, 2:] + T[1:-1, :-2] - 4 * T[1:-1, 1:-1])
     return T + T_inc
@@ -547,6 +549,8 @@ def time_march(p):
         p.diag = 0
     if not hasattr(p, "min_solid_density"):
         p.min_solid_density = 0.5
+    if not hasattr(p, "lagrangian"):
+        p.lagrangian = False
 
     plotter.set_plot_size(p)
     # fig = plt.figure(figsize=[nx / 10., ny / 10.])
@@ -575,11 +579,11 @@ def time_march(p):
     # print(p.dt)
     p.dt = 1.0
 
-    nt = int(np.ceil(p.t_f / p.dt))
+    p.nt = int(np.ceil(p.t_f / p.dt))
 
-    s_bar_time = np.zeros([nt, p.ny])
+    s_bar_time = np.zeros([p.nt, p.ny])
     nu_time = np.zeros_like(s_bar_time)
-    nu_time_x = np.zeros([nt, p.nx])
+    nu_time_x = np.zeros([p.nt, p.nx])
     u_time = np.zeros_like(s_bar_time)
 
     s = IC(p)  # non-dimensional size
@@ -595,21 +599,21 @@ def time_march(p):
         c = None
 
     if p.internal_geometry:
-        boundary = np.zeros([p.nx, p.ny], dtype=bool)
+        p.boundary = np.zeros([p.nx, p.ny], dtype=bool)
         # boundary[4:-4:5,:] = 1
-        boundary[np.cos(500 * 2 * np.pi * X) > 0] = 1
-        boundary[:, : p.nx // 2] = 0
-        boundary[:, -p.nx // 2 :] = 0
-        boundary[:, p.ny // 2 - 5 : p.ny // 2 + 5] = 0
-        boundary[np.abs(X) - 2 * p.half_width * p.dy > Y] = 1
-        boundary[np.abs(X) - 2 * p.half_width * p.dy > p.H - Y] = 1
-        boundary_tile = np.tile(boundary.T, [p.nm, 1, 1]).T
+        p.boundary[np.cos(500 * 2 * np.pi * X) > 0] = 1
+        p.boundary[:, : p.nx // 2] = 0
+        p.boundary[:, -p.nx // 2 :] = 0
+        p.boundary[:, p.ny // 2 - 5 : p.ny // 2 + 5] = 0
+        p.boundary[np.abs(X) - 2 * p.half_width * p.dy > Y] = 1
+        p.boundary[np.abs(X) - 2 * p.half_width * p.dy > p.H - Y] = 1
+        boundary_tile = np.tile(p.boundary.T, [p.nm, 1, 1]).T
         s[boundary_tile] = np.nan
         # plt.pcolormesh(x,y,boundary.T)
         # plt.show()
         # sys.exit()
     else:
-        boundary = np.zeros([p.nx, p.ny], dtype=bool)
+        p.boundary = np.zeros([p.nx, p.ny], dtype=bool)
 
     if hasattr(p, "temperature"):
         T = p.temperature["inlet_temperature"] * np.ones_like(s)
@@ -618,27 +622,25 @@ def time_march(p):
     else:
         T = None
 
-    plotter.plot_s(x, y, s, p.folderName, t, p.internal_geometry, p.s_m)
-    plotter.plot_nu(x, y, s, p.folderName, t, p.internal_geometry, boundary)
-    plotter.plot_u(x, y, s, u, v, p.folderName, t, p.nm, p.IC_mode, p.internal_geometry, boundary)
+    plotter.plot_s(x, y, s, p, t)
+    plotter.plot_nu(x, y, s, p, t)
+    plotter.plot_u(x, y, s, u, v, p, t)
     if hasattr(p, "concentration"):
-        plotter.plot_c(x, y, s, c, p.folderName, t, p.internal_geometry)
+        plotter.plot_c(x, y, s, c, p, t)
     if hasattr(p, "temperature"):
         plotter.plot_T(
             x,
             y,
             s,
             T,
-            p.folderName,
-            t,
-            p.temperature["boundary_temperature"],
-            p.temperature["inlet_temperature"],
+            p,
+            t
         )
     outlet = []
 
     # print("Running " + p.folderName)
     # print('Tg = ' + str(Tg) + ', k_add = ' + str(free_fall_velocity*dt/(Tg*H)) + '\n')
-    for t in tqdm(range(nt), leave=False, desc="Time"):
+    for t in tqdm(range(p.nt), leave=False, desc="Time"):
         outlet.append(0)
         u = np.zeros_like(u)
         v = np.zeros_like(v)
@@ -647,9 +649,9 @@ def time_march(p):
         s_bar = get_average(s)
         # s_inv_bar = get_hyperbolic_average(s)
         if hasattr(p, "temperature"):
-            T = update_temperature(s, T, boundary)  # delete the particles at the bottom of the hopper
+            T = update_temperature(s, T, p)  # delete the particles at the bottom of the hopper
 
-        u, v, s, c, T = move_voids(u, v, s, p.diag, c, T, boundary)
+        u, v, s, c, T = move_voids(u, v, s, p, c=c, T=T)
 
         # if t % 2 == 0:
         # u, v, s, c, T = move_voids_adv(u, v, s, c, T, boundary)
@@ -664,9 +666,9 @@ def time_march(p):
             u, v, s = close_voids(u, v, s)
 
         if t % p.save_inc == 0:
-            plotter.plot_s(x, y, s, p.folderName, t, p.internal_geometry, p.s_m)
-            plotter.plot_nu(x, y, s, p.folderName, t, p.internal_geometry, boundary)
-            plotter.plot_u(x, y, s, u, v, p.folderName, t, p.nm, p.IC_mode, p.internal_geometry, boundary)
+            plotter.plot_s(x, y, s, p, t)
+            plotter.plot_nu(x, y, s, p, t)
+            plotter.plot_u(x, y, s, u, v, p, t)
 
             if hasattr(p, "concentration"):
                 plotter.plot_c(x, y, s, c, p.folderName, t, p.internal_geometry)
@@ -678,10 +680,8 @@ def time_march(p):
                     y,
                     s,
                     T,
-                    p.folderName,
-                    t,
-                    p.temperature["boundary_temperature"],
-                    p.temperature["inlet_temperature"],
+                    p,
+                    t
                 )
                 np.savetxt(p.folderName + "outlet_T.csv", np.array(outlet_T), delimiter=",")
             if hasattr(p, "save_velocity"):
@@ -696,11 +696,11 @@ def time_march(p):
         t += 1
         # if t % 10 == 0:
         # print(" t = " + str(t * dt) + "                ", end="\r")
-    plotter.plot_s(x, y, s, p.folderName, t, p.internal_geometry, p.s_m)
-    plotter.plot_nu(x, y, s, p.folderName, t, p.internal_geometry, boundary)
-    plotter.plot_u(x, y, s, u, v, p.folderName, t, p.nm, p.IC_mode, p.internal_geometry, boundary)
-    plotter.plot_s_bar(s_bar_time, nu_time, p.s_m, p.folderName)
-    plotter.plot_u_time(y, u_time, nu_time, p.folderName, nt)
+    plotter.plot_s(x, y, s, p, t)
+    plotter.plot_nu(x, y, s, p, t)
+    plotter.plot_u(x, y, s, u, v, p, t)
+    plotter.plot_s_bar(s_bar_time, nu_time, p)
+    plotter.plot_u_time(y, u_time, nu_time, p)
     np.save(p.folderName + "nu_t_x.npy", nu_time_x)
     if hasattr(p, "concentration"):
         plotter.plot_c(c)
@@ -709,7 +709,7 @@ def time_march(p):
     if hasattr(p, "save_velocity"):
         np.savetxt(p.folderName + "u.csv", u / np.sum(np.isnan(s), axis=2), delimiter=",")
     if hasattr(p, "save_density_profile"):
-        plotter.plot_profile(x, nu_time_x, p.folderName, nt, p.t_f)
+        plotter.plot_profile(x, nu_time_x, p)
 
 
 if __name__ == "__main__":
@@ -720,11 +720,11 @@ if __name__ == "__main__":
         p_init = dict_to_class(dict)
 
         all_tests = product(*p_init.lists)
-        for test in all_tests:
+        for test in tqdm(all_tests, leave=False):
             folderName = f"output/{dict['input_filename']}/"
             dict_copy = dict.copy()
             for i,key in enumerate(p_init.list_keys):
-                print(key, test[i])
+                # print(key, test[i])
                 dict_copy[key] = test[i]
                 folderName += f"{key}_{test[i]}/"
             p = dict_to_class(dict_copy)
