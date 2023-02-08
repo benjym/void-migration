@@ -687,7 +687,7 @@ def time_march(p):
             if hasattr(p, "save_velocity"):
                 np.savetxt(p.folderName + "u.csv", u / np.sum(np.isnan(s), axis=2), delimiter=",")
             if hasattr(p, "save_density_profile"):
-                plotter.plot_profile(x, nu_time_x, p.folderName, nt, p.t_f)
+                plotter.plot_profile(x, nu_time_x, p)
 
         s_bar_time[t] = s_bar  # save average size
         u_time[t] = np.mean(u, axis=0)
