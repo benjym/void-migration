@@ -2,7 +2,7 @@
     // resolution
     nx : 51,
     ny : 101,
-    nm : 100,  // number of simultaneous simulations
+    nm : 10,  // number of simultaneous simulations
 
     // geometry
     H : 0.1, // m
@@ -14,7 +14,8 @@
     // mu : [0.5,1.0,2.0],  // friction angle
     mu : [0.1,1.0,10.0],  // friction angle
     half_width : [3],  // half width of outlet in grid points
-    s_m : 0.1, // minimum particle size (non-dimensional)
+    s_m : 0.001, // minimum particle size (m)
+    s_M : 0.01, // maximum particle size (m)
     gsd_mode : 'bi',
 
     // initial conditions
@@ -24,7 +25,7 @@
     // fill : 0.3
 
     // temporal stuff
-    t_f : 500.0,  // final time
+    t_f : 10.0,  // final time
     
     // saving
     save_inc : 20,  // how often to save

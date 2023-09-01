@@ -32,6 +32,7 @@ bwr.set_bad("k", 1.0)
 
 global fig, summary_fig
 
+
 def set_plot_size(p):
     global fig, summary_fig
     dpi = 20
@@ -40,11 +41,12 @@ def set_plot_size(p):
 
 
 def plot_u_time(y, U, nu_time, p):
+    plt.figure(summary_fig)
+
     U = np.ma.masked_where(nu_time < 0.2, U)
-    U = np.amax(U) - U
+    # U = np.amax(U) - U
 
-    plt.figure(fig)
-
+    plt.clf()
     plt.pcolormesh(U.T)  # ,cmap='bwr',vmin=-amax(abs(U))/2,vmax=amax(abs(U))/2)
     plt.colorbar()
     plt.savefig(p.folderName + "u_time.png")
@@ -54,22 +56,29 @@ def plot_u_time(y, U, nu_time, p):
     # gamma_dot_y = gradient(u_y,dy)
     # plt.plot(gamma_dot_y,y,'r')
     plt.plot(u_y, y, "b")
+    plt.xlabel('Average horizontal velocity (m/s)')
+    plt.ylabel('Height (m)')
     plt.savefig(p.folderName + "u_avg.png")
+
     np.save(p.folderName + "u_y.npy", np.ma.filled(u_y, np.nan))
     np.save(p.folderName + "nu.npy", np.mean(nu_time[p.nt // 2 :], axis=0))
 
 
-def plot_s_bar(s_bar, nu_time, p):
+def plot_s_bar(y,s_bar, nu_time, p):
     plt.figure(summary_fig)
 
     plt.clf()
-    plt.pcolormesh(s_bar.T, cmap=orange_blue_cmap, vmin=0.99999*p.s_m, vmax=1)
+    plt.pcolormesh(np.linspace(0,p.t_f,p.nt),y,s_bar.T, cmap=orange_blue_cmap, vmin=p.s_m, vmax=p.s_M)
     plt.colorbar()
+    plt.xlabel('Time (s)')
+    plt.ylabel('Height (m)')
     plt.savefig(p.folderName + "s_bar.png")
     np.save(p.folderName + "s_bar.npy", s_bar.T)
 
     plt.clf()
-    plt.pcolormesh(nu_time.T, cmap="inferno", vmin=0, vmax=1)
+    plt.pcolormesh(np.linspace(0,p.t_f,p.nt),y,nu_time.T, cmap="inferno", vmin=0, vmax=1)
+    plt.xlabel('Time (s)')
+    plt.ylabel('Height (m)')
     plt.colorbar()
     plt.savefig(p.folderName + "nu.png")
 
@@ -81,7 +90,7 @@ def plot_s(x, y, s, p, t):
         warnings.simplefilter("ignore", category=RuntimeWarning)
         s_plot = np.nanmean(s, axis=2).T
     s_plot = np.ma.masked_where(np.isnan(s_plot), s_plot)
-    plt.pcolormesh(x, y, s_plot, cmap=orange_blue_cmap, vmin=p.s_m, vmax=1)
+    plt.pcolormesh(x, y, s_plot, cmap=orange_blue_cmap, vmin=p.s_m, vmax=p.s_M)
     # plt.colorbar()
     if p.internal_geometry:
         for i in p.internal_geometry["perf_pts"]:

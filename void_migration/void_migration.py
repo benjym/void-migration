@@ -54,13 +54,14 @@ def IC(p):
     # pick a grain size distribution
     if p.gsd_mode == "mono":
         s = np.ones([p.nx, p.ny, p.nm])  # monodisperse
-        p.s_m = 1
+        p.s_M = p.s_m
     if p.gsd_mode == "bi":  # bidisperse
-        s = np.random.choice([p.s_m, 1], size=[p.nx, p.ny, p.nm])
+        s = np.random.choice([p.s_m, p.s_M], size=[p.nx, p.ny, p.nm])
     elif p.gsd_mode == "poly":  # polydisperse
-        s_0 = p.s_m / (1.0 - p.s_m)  # intermediate calculation
-        s = np.random.rand(p.nx, p.ny, p.nm)
-        s = (s + s_0) / (s_0 + 1.0)  # now between s_m and 1
+        # s_0 = p.s_m / (1.0 - p.s_m)  # intermediate calculation
+        s_non_dim = np.random.rand(p.nx, p.ny, p.nm)
+        # s = (s + s_0) / (s_0 + 1.0)  # now between s_m and 1
+        s = (p.s_M - p.s_m)*s_non_dim + p.s_m
 
     # where particles are in space
     if p.IC_mode == "random":  # voids everywhere randomly
@@ -79,9 +80,8 @@ def IC(p):
         mask = np.ones([p.nx, p.ny, p.nm], dtype=bool)
 
     s[mask] = np.nan
-    
-    return s
 
+    return s
 
 def move_voids_adv(u, v, s, c, T, p):  # Advection
     """
@@ -225,7 +225,7 @@ def move_voids(
     u: ArrayLike,
     v: ArrayLike,
     s: ArrayLike,
-    p : dict_to_class,
+    p: dict_to_class,
     diag: int = 0,
     c: None | ArrayLike = None,
     T: None | ArrayLike = None,
@@ -269,7 +269,7 @@ def move_voids(
                 if np.isnan(s[i, j, k]):
                     # t_p = dy/sqrt(g*(H-y[j])) # local confinement timescale (s)
 
-                    # if np.random.rand() < free_fall_velocity*dt/dy:
+                    # if np.random.rand() < p.free_fall_velocity*p.dt/p.dy:
 
                     # UP
                     if np.isnan(s[i, j + 1, k]):
@@ -431,16 +431,16 @@ def add_voids(u, v, s, c, outlet):
         for i in range(p.nx):
             for k in range(p.nm):
                 if not np.isnan(s[i, 0, k]):
-                    # MOVE UP TO FIRST VOID
-                    # if ( np.random.rand() < (free_fall_velocity*dt)/(Tg*H) and sum(isnan(s[i,:,k])) ) > 0: # Tg is relative height (out of the maximum depth) that voids should rise to before being filled
-                    # first_void = np.isnan(s[i,:,k]).nonzero()[0][0]
-                    # v[i,:first_void+1] += np.isnan(s[i,:first_void+1,k])
-                    # s[i,:first_void+1,k] = roll(s[i,:first_void+1,k],1)
+                    # MOVE UP TO FIRST VOID --- THIS GENERATES SHEARING WHEN INCLINED!
+                    if ( np.random.rand() < (p.Tg*p.H)/(p.free_fall_velocity*p.dt) and np.sum(np.isnan(s[i,:,k])) ) > 0: # Tg is relative height (out of the maximum depth) that voids should rise to before being filled
+                        first_void = np.isnan(s[i,:,k]).nonzero()[0][0]
+                        v[i,:first_void+1] += np.isnan(s[i,:first_void+1,k])
+                        s[i,:first_void+1,k] = np.roll(s[i,:first_void+1,k],1)
                     # MOVE EVERYTHING UP
-                    if (np.random.rand() < p.Tg * p.dt / p.dy and np.sum(np.isnan(s[i, :, k]))) > 0:
-                        if np.isnan(s[i, -1, k]):
-                            v[i, :] += 1  # np.isnan(s[i,:,k])
-                            s[i, :, k] = np.roll(s[i, :, k], 1)
+                    # if (np.random.rand() < p.Tg * p.dt / p.dy and np.sum(np.isnan(s[i, :, k]))) > 0:
+                    #     if np.isnan(s[i, -1, k]):
+                    #         v[i, :] += 1  # np.isnan(s[i,:,k])
+                    #         s[i, :, k] = np.roll(s[i, :, k], 1)
     elif p.add_voids == "mara":  # Add voids at base
         # for i in range(5,nx-5):
         for i in range(p.nx):
@@ -551,9 +551,11 @@ def time_march(p):
         p.min_solid_density = 0.5
     if not hasattr(p, "lagrangian"):
         p.lagrangian = False
+    if not hasattr(p, "g"):
+        p.g = 9.81
 
     plotter.set_plot_size(p)
-    # fig = plt.figure(figsize=[nx / 10., ny / 10.])
+    
     y = np.linspace(0, p.H, p.ny)
     p.dy = y[1] - y[0]
     x = np.linspace(-p.nx * p.dy / 2, p.nx * p.dy / 2, p.nx)  # force equal grid spacing
@@ -562,22 +564,23 @@ def time_march(p):
     y += p.dy / 2.0
     t = 0
 
-    # t_p = s_m/sqrt(g*H) # smallest confinement timescale (at bottom) (s)
-    # free_fall_velocity = np.sqrt(g * p.s_m)
+    p.t_p = p.s_m/np.sqrt(p.g*p.H) # smallest confinement timescale (at bottom) (s)
+    p.free_fall_velocity = np.sqrt(p.g * p.s_m)
 
     p.swap_rate = np.sqrt(4 * p.mu)
 
-    P_scaling = (p.mu**2) / 2.0
-    if P_scaling > 1:  # SOLVED: both swapping probabilities guaranteed to be less than or equal to 0.5
-        p.P_adv = 0.5
-        p.P_diff = p.P_adv / P_scaling
-    else:
-        p.P_diff = 0.5
-        p.P_adv = p.P_diff * P_scaling
+    # P_scaling = (p.mu**2) / 2.0
+    # if P_scaling > 1:  # SOLVED: both swapping probabilities guaranteed to be less than or equal to 0.5
+    #     p.P_adv = 0.5
+    #     p.P_diff = p.P_adv / P_scaling
+    # else:
+    #     p.P_diff = 0.5
+    #     p.P_adv = p.P_diff * P_scaling
 
-    # p.dt = p.P_adv * p.dy / free_fall_velocity
-    # print(p.dt)
-    p.dt = 1.0
+    # p.dt = p.P_adv * p.dy / p.free_fall_velocity
+    p.dt = 1 * p.dy / p.free_fall_velocity # HACK: WHY ONE?!?
+    print(f"Time step is {p.dt} s")
+    # p.dt = 1.0
 
     p.nt = int(np.ceil(p.t_f / p.dt))
 
@@ -628,18 +631,11 @@ def time_march(p):
     if hasattr(p, "concentration"):
         plotter.plot_c(x, y, s, c, p, t)
     if hasattr(p, "temperature"):
-        plotter.plot_T(
-            x,
-            y,
-            s,
-            T,
-            p,
-            t
-        )
+        plotter.plot_T(x, y, s, T, p, t)
     outlet = []
 
     # print("Running " + p.folderName)
-    # print('Tg = ' + str(Tg) + ', k_add = ' + str(free_fall_velocity*dt/(Tg*H)) + '\n')
+    # print('Tg = ' + str(Tg) + ', k_add = ' + str(p.free_fall_velocity*dt/(Tg*H)) + '\n')
     for t in tqdm(range(p.nt), leave=False, desc="Time"):
         outlet.append(0)
         u = np.zeros_like(u)
@@ -675,14 +671,7 @@ def time_march(p):
             if hasattr(p, "save_outlet"):
                 np.savetxt(p.folderName + "outlet.csv", np.array(outlet), delimiter=",")
             if hasattr(p, "temperature"):
-                plotter.plot_T(
-                    x,
-                    y,
-                    s,
-                    T,
-                    p,
-                    t
-                )
+                plotter.plot_T(x, y, s, T, p, t)
                 np.savetxt(p.folderName + "outlet_T.csv", np.array(outlet_T), delimiter=",")
             if hasattr(p, "save_velocity"):
                 np.savetxt(p.folderName + "u.csv", u / np.sum(np.isnan(s), axis=2), delimiter=",")
@@ -699,7 +688,7 @@ def time_march(p):
     plotter.plot_s(x, y, s, p, t)
     plotter.plot_nu(x, y, s, p, t)
     plotter.plot_u(x, y, s, u, v, p, t)
-    plotter.plot_s_bar(s_bar_time, nu_time, p)
+    plotter.plot_s_bar(y,s_bar_time, nu_time, p)
     plotter.plot_u_time(y, u_time, nu_time, p)
     np.save(p.folderName + "nu_t_x.npy", nu_time_x)
     if hasattr(p, "concentration"):
@@ -719,20 +708,17 @@ if __name__ == "__main__":
         dict["input_filename"] = (sys.argv[1].split("/")[-1]).split(".")[0]
         p_init = dict_to_class(dict)
 
-        all_tests = product(*p_init.lists)
-        for test in tqdm(all_tests, leave=False):
+        all_sims = list(product(*p_init.lists))
+
+        for sim in tqdm(all_sims, desc="Sim", leave=False):
             folderName = f"output/{dict['input_filename']}/"
             dict_copy = dict.copy()
-            for i,key in enumerate(p_init.list_keys):
-                # print(key, test[i])
-                dict_copy[key] = test[i]
-                folderName += f"{key}_{test[i]}/"
+            for i, key in enumerate(p_init.list_keys):
+                dict_copy[key] = sim[i]
+                folderName += f"{key}_{sim[i]}/"
             p = dict_to_class(dict_copy)
             p.folderName = folderName
-            # print(p.mu)
             time_march(p)
-
-
 
         # for i in tqdm(p_init.mu, desc="Friction angle", disable=(len(p_init.mu) == 1)):
         #     p.foldername += f"mu_{i}/"
