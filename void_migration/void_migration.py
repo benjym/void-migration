@@ -61,11 +61,11 @@ def IC(p):
         # s_0 = p.s_m / (1.0 - p.s_m)  # intermediate calculation
         s_non_dim = np.random.rand(p.nx, p.ny, p.nm)
         # s = (s + s_0) / (s_0 + 1.0)  # now between s_m and 1
-        s = (p.s_M - p.s_m)*s_non_dim + p.s_m
+        s = (p.s_M - p.s_m) * s_non_dim + p.s_m
 
     # where particles are in space
     if p.IC_mode == "random":  # voids everywhere randomly
-        mask = np.random.rand(p.nx, p.ny, p.nm) < p.fill_ratio
+        mask = np.random.rand(p.nx, p.ny, p.nm) > p.fill_ratio
     elif p.IC_mode == "top":  # voids at the top
         mask = np.zeros([p.nx, p.ny, p.nm], dtype=bool)
         mask[:, int(p.fill_ratio * p.ny) :, :] = True
@@ -82,6 +82,7 @@ def IC(p):
     s[mask] = np.nan
 
     return s
+
 
 def move_voids_adv(u, v, s, c, T, p):  # Advection
     """
@@ -221,6 +222,10 @@ def move_voids_diff(u, v, s, c, T, p):  # Diffusion
     return u, v, s, c, T
 
 
+def density(s, i, j):
+    return np.mean(~np.isnan(s[i, j, :]))
+
+
 def move_voids(
     u: ArrayLike,
     v: ArrayLike,
@@ -258,6 +263,8 @@ def move_voids(
     # print(A)
     # A = 0.01
 
+    # density = np.mean(~np.isnan(s), axis=2)
+
     for j in range(p.ny - 2, -1, -1):
         if p.internal_geometry:
             x_loop = np.arange(p.nx)[~p.boundary[:, j]]  # don't move apparent voids at boundaries
@@ -265,98 +272,106 @@ def move_voids(
             x_loop = np.arange(p.nx)
         np.random.shuffle(x_loop)
         for i in x_loop:
-            for k in range(p.nm):
-                if np.isnan(s[i, j, k]):
-                    # t_p = dy/sqrt(g*(H-y[j])) # local confinement timescale (s)
+            # if density[i,j] < p.critical_density:
+            if density(s, i, j) < p.critical_density:
+                for k in range(p.nm):
+                    if np.isnan(s[i, j, k]):
+                        # t_p = dy/sqrt(g*(H-y[j])) # local confinement timescale (s)
 
-                    # if np.random.rand() < p.free_fall_velocity*p.dt/p.dy:
+                        # if np.random.rand() < p.free_fall_velocity*p.dt/p.dy:
 
-                    # UP
-                    if np.isnan(s[i, j + 1, k]):
-                        P_u = 0
-                    else:
-                        P_u = 1.0 / p.swap_rate / s[i, j + 1, k]  # FIXME ????
-
-                    # LEFT
-                    if i > 0:
-                        if np.isnan(s[i - 1, j + diag, k]):  # or np.mean(np.isnan(s[i - 1, j + 1, :])) > A:
-                            P_l = 0  # P_r + P_l = 1 at s=1
+                        # UP
+                        if np.isnan(s[i, j + 1, k]) or density(s, i, j + 1) > p.critical_density:
+                            P_u = 0
                         else:
-                            P_l = (0.5 + 0.5 * np.sin(np.radians(p.theta))) / s[i - 1, j + diag, k]
+                            P_u = 1.0 / p.swap_rate / s[i, j + 1, k]  # FIXME ????
 
-                        if hasattr(p, "internal_geometry"):
-                            if p.boundary[i - 1, j + diag]:
-                                P_l *= p.internal_geometry["perf_rate"]
-                        # if perf_plate and i-1==perf_pts[0]: P_l *= perf_rate
-                        # if perf_plate and i-1==perf_pts[1]: P_l *= perf_rate
-                    elif p.cyclic_BC:
-                        if np.isnan(s[-1, j + diag, k]):
-                            P_l = 0  # UP LEFT
+                        # LEFT
+                        if i > 0:
+                            if (
+                                np.isnan(s[i - 1, j + diag, k])
+                                or density(s, i - 1, j + diag) > p.critical_density
+                            ):  # or np.mean(np.isnan(s[i - 1, j + 1, :])) > A:
+                                P_l = 0  # P_r + P_l = 1 at s=1
+                            else:
+                                P_l = (0.5 + 0.5 * np.sin(np.radians(p.theta))) / s[i - 1, j + diag, k]
+
+                            if hasattr(p, "internal_geometry"):
+                                if p.boundary[i - 1, j + diag]:
+                                    P_l *= p.internal_geometry["perf_rate"]
+                            # if perf_plate and i-1==perf_pts[0]: P_l *= perf_rate
+                            # if perf_plate and i-1==perf_pts[1]: P_l *= perf_rate
+                        elif p.cyclic_BC:
+                            if np.isnan(s[-1, j + diag, k]):
+                                P_l = 0  # UP LEFT
+                            else:
+                                P_l = (0.5 + 0.5 * np.sin(np.radians(p.theta))) / s[-1, j + diag, k]
                         else:
-                            P_l = (0.5 + 0.5 * np.sin(np.radians(p.theta))) / s[-1, j + diag, k]
-                    else:
-                        P_l = 0
+                            P_l = 0
 
-                    # RIGHT
-                    if i + 1 < p.nx:
-                        # if ( not np.isnan(s[i+1,j,k]) and not np.isnan(s[i+1,j+1,k]) ): # RIGHT
-                        if np.isnan(s[i + 1, j + diag, k]):  # or np.mean(np.isnan(s[i + 1, j + 1, :])) > A:
+                        # RIGHT
+                        if i + 1 < p.nx:
+                            # if ( not np.isnan(s[i+1,j,k]) and not np.isnan(s[i+1,j+1,k]) ): # RIGHT
+                            if (
+                                np.isnan(s[i + 1, j + diag, k])
+                                or density(s, i + 1, j + diag) > p.critical_density
+                            ):  # or np.mean(np.isnan(s[i + 1, j + 1, :])) > A:
+                                P_r = 0
+                            else:
+                                P_r = (0.5 - 0.5 * np.sin(np.radians(p.theta))) / s[i + 1, j + diag, k]
+
+                            if p.internal_geometry:
+                                if p.boundary[i + 1, j + diag]:
+                                    P_r *= p.internal_geometry["perf_rate"]
+                            # if perf_plate and i+1==perf_pts[0]: P_r *= perf_rate
+                            # if perf_plate and i+1==perf_pts[1]: P_r *= perf_rate
+                        elif p.cyclic_BC:
+                            if np.isnan(s[0, j + diag, k]):
+                                P_r = 0
+                            else:
+                                P_r = (0.5 - 0.5 * np.sin(np.radians(p.theta))) / s[0, j + diag, k]
+                        else:
                             P_r = 0
-                        else:
-                            P_r = (0.5 - 0.5 * np.sin(np.radians(p.theta))) / s[i + 1, j + diag, k]
 
-                        if p.internal_geometry:
-                            if p.boundary[i + 1, j + diag]:
-                                P_r *= p.internal_geometry["perf_rate"]
-                        # if perf_plate and i+1==perf_pts[0]: P_r *= perf_rate
-                        # if perf_plate and i+1==perf_pts[1]: P_r *= perf_rate
-                    elif p.cyclic_BC:
-                        if np.isnan(s[0, j + diag, k]):
-                            P_r = 0
-                        else:
-                            P_r = (0.5 - 0.5 * np.sin(np.radians(p.theta))) / s[0, j + diag, k]
-                    else:
-                        P_r = 0
+                        P_tot = P_u + P_l + P_r
 
-                    P_tot = P_u + P_l + P_r
-
-                    if P_tot > 0:
-                        P = np.random.rand()
-                        if P < P_u / P_tot and P_u > 0:  # go up
-                            dest = [i, j + 1, k]
-                            v[i, j] += 1
-                        elif P < (P_l + P_u) / P_tot:  # go left
-                            dest = [i - 1, j + diag, k]
-                            if diag == 0:
-                                u[i, j] += 1  # LEFT
+                        if P_tot > 0:
+                            P = np.random.rand()
+                            if P < P_u / P_tot and P_u > 0:  # go up
+                                dest = [i, j + 1, k]
                                 v[i, j] += 1
-                            else:
-                                u[i, j] += np.sqrt(2)  # UP LEFT
-                                v[i, j] += np.sqrt(2)
-                        else:  # go right
-                            if i + 1 < p.nx:
-                                dest = [i + 1, j + diag, k]  # not a boundary
-                            else:
-                                dest = [0, j + diag, k]  # right boundary
-                            # if np.mean(~np.isnan(s[dest, j + 1, :])) > A:  # * (np.mean(np.isnan(s[i, j, :])) < 0.5):  # this sets the angle of repose
-                            if diag == 0:
-                                u[i, j] -= 1  # RIGHT
-                                v[i, j] += 1
-                            else:
-                                u[i, j] -= np.sqrt(2)  # UP RIGHT
-                                v[i, j] += np.sqrt(2)
+                            elif P < (P_l + P_u) / P_tot:  # go left
+                                dest = [i - 1, j + diag, k]
+                                if diag == 0:
+                                    u[i, j] += 1  # LEFT
+                                    v[i, j] += 1
+                                else:
+                                    u[i, j] += np.sqrt(2)  # UP LEFT
+                                    v[i, j] += np.sqrt(2)
+                            else:  # go right
+                                if i + 1 < p.nx:
+                                    dest = [i + 1, j + diag, k]  # not a boundary
+                                else:
+                                    dest = [0, j + diag, k]  # right boundary
+                                # if np.mean(~np.isnan(s[dest, j + 1, :])) > A:  # * (np.mean(np.isnan(s[i, j, :])) < 0.5):  # this sets the angle of repose
+                                if diag == 0:
+                                    u[i, j] -= 1  # RIGHT
+                                    v[i, j] += 1
+                                else:
+                                    u[i, j] -= np.sqrt(2)  # UP RIGHT
+                                    v[i, j] += np.sqrt(2)
 
-                        # more than critical void threshold, we are a gas
-                        # if np.mean(np.isnan(s[i, j, :])) > (1 - p.min_solid_density):
-                        #     # print("aa")
-                        #     s, c, T = swap([i, j, k], [i, j + 1, k], [s, c, T])
-                        # else:
-                        #     if (
-                        #         np.mean(np.isnan(s[dest[0], j + 1, :])) < A
-                        #     ):  # only swap in if there is support?
-                        s, c, T = swap([i, j, k], dest, [s, c, T])
-                        # u[i,j] += dest[0] - i
-                        # v[i,j] += dest[1] - j
+                            # more than critical void threshold, we are a gas
+                            # if np.mean(np.isnan(s[i, j, :])) > (1 - p.min_solid_density):
+                            #     # print("aa")
+                            #     s, c, T = swap([i, j, k], [i, j + 1, k], [s, c, T])
+                            # else:
+                            #     if (
+                            #         np.mean(np.isnan(s[dest[0], j + 1, :])) < A
+                            #     ):  # only swap in if there is support?
+                            s, c, T = swap([i, j, k], dest, [s, c, T])
+                            # u[i,j] += dest[0] - i
+                            # v[i,j] += dest[1] - j
 
     return u, v, s, c, T
 
@@ -432,10 +447,13 @@ def add_voids(u, v, s, c, outlet):
             for k in range(p.nm):
                 if not np.isnan(s[i, 0, k]):
                     # MOVE UP TO FIRST VOID --- THIS GENERATES SHEARING WHEN INCLINED!
-                    if ( np.random.rand() < (p.Tg*p.H)/(p.free_fall_velocity*p.dt) and np.sum(np.isnan(s[i,:,k])) ) > 0: # Tg is relative height (out of the maximum depth) that voids should rise to before being filled
-                        first_void = np.isnan(s[i,:,k]).nonzero()[0][0]
-                        v[i,:first_void+1] += np.isnan(s[i,:first_void+1,k])
-                        s[i,:first_void+1,k] = np.roll(s[i,:first_void+1,k],1)
+                    if (
+                        np.random.rand() < (p.Tg * p.H) / (p.free_fall_velocity * p.dt)
+                        and np.sum(np.isnan(s[i, :, k]))
+                    ) > 0:  # Tg is relative height (out of the maximum depth) that voids should rise to before being filled
+                        first_void = np.isnan(s[i, :, k]).nonzero()[0][0]
+                        v[i, : first_void + 1] += np.isnan(s[i, : first_void + 1, k])
+                        s[i, : first_void + 1, k] = np.roll(s[i, : first_void + 1, k], 1)
                     # MOVE EVERYTHING UP
                     # if (np.random.rand() < p.Tg * p.dt / p.dy and np.sum(np.isnan(s[i, :, k]))) > 0:
                     #     if np.isnan(s[i, -1, k]):
@@ -555,7 +573,7 @@ def time_march(p):
         p.g = 9.81
 
     plotter.set_plot_size(p)
-    
+
     y = np.linspace(0, p.H, p.ny)
     p.dy = y[1] - y[0]
     x = np.linspace(-p.nx * p.dy / 2, p.nx * p.dy / 2, p.nx)  # force equal grid spacing
@@ -564,7 +582,7 @@ def time_march(p):
     y += p.dy / 2.0
     t = 0
 
-    p.t_p = p.s_m/np.sqrt(p.g*p.H) # smallest confinement timescale (at bottom) (s)
+    p.t_p = p.s_m / np.sqrt(p.g * p.H)  # smallest confinement timescale (at bottom) (s)
     p.free_fall_velocity = np.sqrt(p.g * p.s_m)
 
     p.swap_rate = np.sqrt(4 * p.mu)
@@ -578,7 +596,7 @@ def time_march(p):
     #     p.P_adv = p.P_diff * P_scaling
 
     # p.dt = p.P_adv * p.dy / p.free_fall_velocity
-    p.dt = 1 * p.dy / p.free_fall_velocity # HACK: WHY ONE?!?
+    p.dt = 1 * p.dy / p.free_fall_velocity  # HACK: WHY ONE?!?
     print(f"Time step is {p.dt} s")
     # p.dt = 1.0
 
@@ -688,7 +706,7 @@ def time_march(p):
     plotter.plot_s(x, y, s, p, t)
     plotter.plot_nu(x, y, s, p, t)
     plotter.plot_u(x, y, s, u, v, p, t)
-    plotter.plot_s_bar(y,s_bar_time, nu_time, p)
+    plotter.plot_s_bar(y, s_bar_time, nu_time, p)
     plotter.plot_u_time(y, u_time, nu_time, p)
     np.save(p.folderName + "nu_t_x.npy", nu_time_x)
     if hasattr(p, "concentration"):

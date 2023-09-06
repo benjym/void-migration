@@ -56,29 +56,29 @@ def plot_u_time(y, U, nu_time, p):
     # gamma_dot_y = gradient(u_y,dy)
     # plt.plot(gamma_dot_y,y,'r')
     plt.plot(u_y, y, "b")
-    plt.xlabel('Average horizontal velocity (m/s)')
-    plt.ylabel('Height (m)')
+    plt.xlabel("Average horizontal velocity (m/s)")
+    plt.ylabel("Height (m)")
     plt.savefig(p.folderName + "u_avg.png")
 
     np.save(p.folderName + "u_y.npy", np.ma.filled(u_y, np.nan))
     np.save(p.folderName + "nu.npy", np.mean(nu_time[p.nt // 2 :], axis=0))
 
 
-def plot_s_bar(y,s_bar, nu_time, p):
+def plot_s_bar(y, s_bar, nu_time, p):
     plt.figure(summary_fig)
 
     plt.clf()
-    plt.pcolormesh(np.linspace(0,p.t_f,p.nt),y,s_bar.T, cmap=orange_blue_cmap, vmin=p.s_m, vmax=p.s_M)
+    plt.pcolormesh(np.linspace(0, p.t_f, p.nt), y, s_bar.T, cmap=orange_blue_cmap, vmin=p.s_m, vmax=p.s_M)
     plt.colorbar()
-    plt.xlabel('Time (s)')
-    plt.ylabel('Height (m)')
+    plt.xlabel("Time (s)")
+    plt.ylabel("Height (m)")
     plt.savefig(p.folderName + "s_bar.png")
     np.save(p.folderName + "s_bar.npy", s_bar.T)
 
     plt.clf()
-    plt.pcolormesh(np.linspace(0,p.t_f,p.nt),y,nu_time.T, cmap="inferno", vmin=0, vmax=1)
-    plt.xlabel('Time (s)')
-    plt.ylabel('Height (m)')
+    plt.pcolormesh(np.linspace(0, p.t_f, p.nt), y, nu_time.T, cmap="inferno", vmin=0, vmax=1)
+    plt.xlabel("Time (s)")
+    plt.ylabel("Height (m)")
     plt.colorbar()
     plt.savefig(p.folderName + "nu.png")
 

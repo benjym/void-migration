@@ -17,6 +17,7 @@
     s_m : 0.001, // minimum particle size (m)
     s_M : 0.01, // maximum particle size (m)
     gsd_mode : 'bi',
+    'critical_density' : 0.5,  // critical density below which motion stops
 
     // initial conditions
     IC_mode : "top",  // just leave empty space at the top
