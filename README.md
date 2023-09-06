@@ -8,7 +8,8 @@ A python package for simulating the motion of a granular material as a result of
 
 1.  Download and unzip (or clone) this repository
 2.  Install python 3.11 or newer
-3.  Install the required python packages with `pip install numpy matplotlib tqdm json5`
+3.  Install the required python packages with `pip install -e .`
+4.  Set up your pre-commit hooks (so that when you make changes things are kept nice and clean) by running `pre-commit install`
 4.  Run the code with `python void_migration/void_migration.py json/collapse.json5`. The parameters for this specific case are stored in `json/collapse.json5`. Change that file name to a different `json5` file to use those values instead.
 
 # Documentation

@@ -1,5 +1,27 @@
 [project]
+name = "void_migration"
+version = "0.2"
 requires-python = ">=3.11"
+authors = [
+  {name = "Benjy Marks", email = "benjy.marks@sydney.edu.au"},
+  {name = "Shivakumar Athani", email = "shivakumar.athani@sydney.edu.au"}
+]
+description = "A heterarchical stochastic solver for the motion, segregation, mixing and crushing of granular media"
+readme = "README.md"
+license = {file = "LICENSE.txt"}
+keywords = ["granular", "void", "migration", "heterarchical", "stochastic"]
+dependencies = [
+    "numpy",
+    "matplotlib",
+    "tqdm",
+    "json5",
+    "black",
+    "flake8",
+    "mkdocs",
+    "mkdocstrings[python]",
+    "mkdocs-material",
+    "pre-commit",
+]
 
 [build-system]
 requires = ["setuptools", "wheel"]
@@ -8,3 +30,6 @@ build-backend = "setuptools.build_meta"
 [tool.black]
 line-length = 110
 target-version = ['py311']
+
+[tool.setuptools]
+packages = ["void_migration"]
