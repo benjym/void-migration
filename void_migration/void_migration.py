@@ -226,7 +226,7 @@ def density(s: np.ndarray, i: int, j: int) -> float:
     """Calculate density of a single physical in a 3D array.
 
     Args:
-        s: a 3D array
+        s: a 3D numpy array
         i: an integer representing a row index
         j: an integer representing a column index
 
