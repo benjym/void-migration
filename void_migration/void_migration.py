@@ -222,7 +222,17 @@ def move_voids_diff(u, v, s, c, T, p):  # Diffusion
     return u, v, s, c, T
 
 
-def density(s, i, j):
+def density(s: np.ndarray, i: int, j: int) -> float:
+    """Calculate density of a single physical in a 3D array.
+
+    Args:
+        s: a 3D array
+        i: an integer representing a row index
+        j: an integer representing a column index
+
+    Returns:
+        The density of the solid phase in s at (i, j) as a float.
+    """
     return np.mean(~np.isnan(s[i, j, :]))
 
 
