@@ -15,6 +15,7 @@
     theta : 0.0,
     gsd_mode : 'mono',
     s_m : 0.001, // minimum particle size (m)
+    critical_density : 0.5,
     // diag: 1,
     // Tg : float(sys.argv[4]),
     

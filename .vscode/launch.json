@@ -15,7 +15,7 @@
             "python": "${workspaceFolder}/.venv/py311/bin/python",
             "console": "integratedTerminal",
             "justMyCode": true
-        }
+        },
         {
             "name": "Hopper refill",
             "type": "python",
@@ -23,6 +23,30 @@
             "program": "${workspaceFolder}/void_migration/void_migration.py",
             "args": [
                 "${workspaceFolder}/json/hopper.json5"
+            ],
+            "python": "${workspaceFolder}/.venv/py311/bin/python",
+            "console": "integratedTerminal",
+            "justMyCode": true
+        },
+        {
+            "name": "Collapse",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/void_migration/void_migration.py",
+            "args": [
+                "${workspaceFolder}/json/collapse.json5"
+            ],
+            "python": "${workspaceFolder}/.venv/py311/bin/python",
+            "console": "integratedTerminal",
+            "justMyCode": true
+        },
+        {
+            "name": "Inclined plane bidisperse",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/void_migration/void_migration.py",
+            "args": [
+                "${workspaceFolder}/json/inclined-plane-bidisperse.json5"
             ],
             "python": "${workspaceFolder}/.venv/py311/bin/python",
             "console": "integratedTerminal",

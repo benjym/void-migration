@@ -256,10 +256,10 @@ def move_voids(
     """
 
     # WHERE THE HELL DID THIS COME FROM???
-    if p.mu < 1:
-        A = p.mu / 2.0  # proportion of cell that should be filled diagonally up
-    else:
-        A = 1.0 - 1.0 / (2.0 * p.mu)
+    # if p.mu < 1:
+    #     A = p.mu / 2.0  # proportion of cell that should be filled diagonally up
+    # else:
+    #     A = 1.0 - 1.0 / (2.0 * p.mu)
     # print(A)
     # A = 0.01
 
@@ -281,7 +281,7 @@ def move_voids(
                         # if np.random.rand() < p.free_fall_velocity*p.dt/p.dy:
 
                         # UP
-                        if np.isnan(s[i, j + 1, k]) or density(s, i, j + 1) > p.critical_density:
+                        if np.isnan(s[i, j + 1, k]):  # or density(s, i, j + 1) < p.critical_density:
                             P_u = 0
                         else:
                             P_u = 1.0 / p.swap_rate / s[i, j + 1, k]  # FIXME ????
@@ -290,7 +290,7 @@ def move_voids(
                         if i > 0:
                             if (
                                 np.isnan(s[i - 1, j + diag, k])
-                                or density(s, i - 1, j + diag) > p.critical_density
+                                or density(s, i - 1, j + diag) < p.critical_density
                             ):  # or np.mean(np.isnan(s[i - 1, j + 1, :])) > A:
                                 P_l = 0  # P_r + P_l = 1 at s=1
                             else:
@@ -314,7 +314,7 @@ def move_voids(
                             # if ( not np.isnan(s[i+1,j,k]) and not np.isnan(s[i+1,j+1,k]) ): # RIGHT
                             if (
                                 np.isnan(s[i + 1, j + diag, k])
-                                or density(s, i + 1, j + diag) > p.critical_density
+                                or density(s, i + 1, j + diag) < p.critical_density
                             ):  # or np.mean(np.isnan(s[i + 1, j + 1, :])) > A:
                                 P_r = 0
                             else:
