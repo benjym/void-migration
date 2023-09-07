@@ -1,0 +1,32 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Hopper empty",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/void_migration/void_migration.py",
+            "args": [
+                "${workspaceFolder}/json/hopper_emptying.json5"
+            ],
+            "python": "${workspaceFolder}/.venv/py311/bin/python",
+            "console": "integratedTerminal",
+            "justMyCode": true
+        }
+        {
+            "name": "Hopper refill",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/void_migration/void_migration.py",
+            "args": [
+                "${workspaceFolder}/json/hopper.json5"
+            ],
+            "python": "${workspaceFolder}/.venv/py311/bin/python",
+            "console": "integratedTerminal",
+            "justMyCode": true
+        }
+    ]
+}

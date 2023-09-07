@@ -1,4 +1,8 @@
 repos:
+  - repo: https://github.com/pycqa/flake8
+    rev: '14c5edf'  # pick a git hash / tag to point to
+    hooks:
+      - id: flake8
   # Using this mirror lets us use mypyc-compiled black, which is about 2x faster
   - repo: https://github.com/psf/black-pre-commit-mirror
     rev: 23.7.0

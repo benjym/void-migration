@@ -4,3 +4,4 @@ site/
 __pycache__/
 void_migration.egg-info/
 output/
+.venv/
