@@ -17,3 +17,4 @@ You can [read the docs here](https://benjym.github.io/void-migration/).
 
 # Authors
 - [Benjy Marks](mailto:benjy.marks@sydney.edu.au)
+- [Shivakumar Athani](mailto:shivakumar.athani@sydney.edu.au)
