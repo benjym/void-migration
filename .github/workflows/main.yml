@@ -16,14 +16,19 @@ jobs:
       - uses: actions/checkout@v3
       - uses: actions/setup-python@v4
         with:
-          python-version: 3.x
+          python-version: 3.11
       # - uses: actions/setup-node@v2
       # - run: pip install pycco
       # - run: pycco void-migration/*.py
       # - run: touch docs/.nojekyll
-      - run: pip install numpy matplotlib tqdm json5
-      - run: pip install mkdocs "mkdocstrings[python]" mkdocs-material
+      - run: pip install -e .
       - run: mkdocs gh-deploy --force
+
+      - uses: distributhor/workflow-webhook@v3.0.5
+        env:
+          webhook_url: ${{ secrets.WEBHOOK_URL }}
+          data : '{"text": "New push to repo. Latest commit message: ${{ github.event.head_commit.message }}"}'
+
       # - run: mkdocs build
 
       # - name: Deploy to GitHub Pages
