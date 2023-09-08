@@ -24,7 +24,10 @@ jobs:
       - run: pip install -e .
       - run: mkdocs gh-deploy --force
 
-      - uses: distributhor/workflow-webhook@v3
+      - run: echo ${{ secrets.WEBHOOK_URL }}
+
+      - name: Invoke deployment hook
+        uses: distributhor/workflow-webhook@v3
         env:
           webhook_url: ${{ secrets.WEBHOOK_URL }}
           data : '{"text": "New push to repo. Latest commit message: ${{ github.event.head_commit.message }}"}'
