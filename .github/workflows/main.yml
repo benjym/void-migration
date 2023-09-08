@@ -24,7 +24,10 @@ jobs:
       - run: pip install -e .
       - run: mkdocs gh-deploy --force
 
-      - run: curl -i -X POST -H 'Content-Type: application/json' -d '{"text": "New push to repo. Latest commit message: ${{ github.event.head_commit.message }}"}' ${{ secrets.WEBHOOK_URL }}
+      - run: |
+          curl -i -X POST -H 'Content-Type: application/json' -d '{
+            "text": "New push to repo. Latest commit message: ${{ github.event.head_commit.message }}"
+          }' ${{ secrets.WEBHOOK_URL }}
       
       # - run: mkdocs build
 
