@@ -17,6 +17,7 @@ from tqdm import tqdm
 import warnings
 import json5
 from itertools import product
+from numba import jit, njit
 
 from numpy.typing import ArrayLike
 
@@ -29,8 +30,8 @@ class dict_to_class:
     """
 
     def __init__(self, dict: dict):
-        list_keys = []
-        lists = []
+        list_keys: List[str] = []
+        lists: List[List] = []
         for key in dict:
             setattr(self, key, dict[key])
             if isinstance(dict[key], list):
@@ -233,9 +234,11 @@ def density(s: np.ndarray, i: int, j: int) -> float:
     Returns:
         The density of the solid phase in s at (i, j) as a float.
     """
-    return np.mean(~np.isnan(s[i, j, :]))
+    # return np.mean(~np.isnan(s[i, j, :]))
+    return 1.0 - np.mean(np.isnan(s[i, j, :]))
 
 
+# @njit
 def move_voids(
     u: ArrayLike,
     v: ArrayLike,
@@ -265,15 +268,14 @@ def move_voids(
         T: The updated temperature field
     """
 
-    # WHERE THE HELL DID THIS COME FROM???
-    # if p.mu < 1:
-    #     A = p.mu / 2.0  # proportion of cell that should be filled diagonally up
-    # else:
-    #     A = 1.0 - 1.0 / (2.0 * p.mu)
-    # print(A)
-    # A = 0.01
+    # A is the proportion of the cell that should be filled diagonally up
+    # Comes from a simple geometric argument where the slope goes through one corner of the cell
+    if p.mu < 1:
+        A = p.mu / 2.0  # proportion of cell that should be filled where the slope goes through one corner
+    else:
+        A = 1.0 - 1.0 / (2.0 * p.mu)
 
-    # density = np.mean(~np.isnan(s), axis=2)
+    # print(f'A = {A}')
 
     for j in range(p.ny - 2, -1, -1):
         if p.internal_geometry:
@@ -282,7 +284,6 @@ def move_voids(
             x_loop = np.arange(p.nx)
         np.random.shuffle(x_loop)
         for i in x_loop:
-            # if density[i,j] < p.critical_density:
             if density(s, i, j) < p.critical_density:
                 for k in range(p.nm):
                     if np.isnan(s[i, j, k]):
@@ -291,7 +292,7 @@ def move_voids(
                         # if np.random.rand() < p.free_fall_velocity*p.dt/p.dy:
 
                         # UP
-                        if np.isnan(s[i, j + 1, k]):  # or density(s, i, j + 1) < p.critical_density:
+                        if np.isnan(s[i, j + 1, k]):
                             P_u = 0
                         else:
                             P_u = 1.0 / p.swap_rate / s[i, j + 1, k]  # FIXME ????
@@ -300,8 +301,10 @@ def move_voids(
                         if i > 0:
                             if (
                                 np.isnan(s[i - 1, j + diag, k])
-                                or density(s, i - 1, j + diag) < p.critical_density
-                            ):  # or np.mean(np.isnan(s[i - 1, j + 1, :])) > A:
+                                # or density(s, i - 1, j + diag) < p.critical_density
+                                or density(s, i - 1, j + 1) <= A
+                                # or density(s, i - 1, j + 1) <= A*p.critical_density
+                            ):
                                 P_l = 0  # P_r + P_l = 1 at s=1
                             else:
                                 P_l = (0.5 + 0.5 * np.sin(np.radians(p.theta))) / s[i - 1, j + diag, k]
@@ -324,8 +327,10 @@ def move_voids(
                             # if ( not np.isnan(s[i+1,j,k]) and not np.isnan(s[i+1,j+1,k]) ): # RIGHT
                             if (
                                 np.isnan(s[i + 1, j + diag, k])
-                                or density(s, i + 1, j + diag) < p.critical_density
-                            ):  # or np.mean(np.isnan(s[i + 1, j + 1, :])) > A:
+                                # or density(s, i + 1, j + diag) < p.critical_density
+                                or density(s, i + 1, j + 1) <= A
+                                # or density(s, i + 1, j + 1) <= A*p.critical_density
+                            ):
                                 P_r = 0
                             else:
                                 P_r = (0.5 - 0.5 * np.sin(np.radians(p.theta))) / s[i + 1, j + diag, k]
@@ -575,12 +580,14 @@ def time_march(p):
         p.close_voids = False
     if not hasattr(p, "diag"):
         p.diag = 0
-    if not hasattr(p, "min_solid_density"):
-        p.min_solid_density = 0.5
+    # if not hasattr(p, "min_solid_density"):
+    # p.min_solid_density = 0.5
     if not hasattr(p, "lagrangian"):
         p.lagrangian = False
     if not hasattr(p, "g"):
         p.g = 9.81
+    if not hasattr(p, "critical_density"):
+        p.critical_density = 0.5
 
     plotter.set_plot_size(p)
 
@@ -607,7 +614,7 @@ def time_march(p):
 
     # p.dt = p.P_adv * p.dy / p.free_fall_velocity
     p.dt = 1 * p.dy / p.free_fall_velocity  # HACK: WHY ONE?!?
-    print(f"Time step is {p.dt} s")
+    # print(f"Time step is {p.dt} s")
     # p.dt = 1.0
 
     p.nt = int(np.ceil(p.t_f / p.dt))

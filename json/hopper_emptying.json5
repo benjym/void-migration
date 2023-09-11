@@ -21,15 +21,15 @@
 
     // initial conditions
     // IC_mode : "top",  // just leave empty space at the top
-    fill_ratio : 0.6,  // how high to fill the container initially
+    fill_ratio : 0.7,  // how high to fill the container initially
     IC_mode : 'random',
     // fill : 0.3,
 
     // temporal stuff
-    t_f : 20.0,  // final time
+    t_f : 10.0,  // final time
     
     // saving
-    save_inc : 20,  // how often to save
+    save_inc : 1,  // how often to save
     save_outlet : true,
 
     // testing area

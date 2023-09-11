@@ -2,16 +2,15 @@
     // resolution
     nx : 50, // width
     ny : 25, // height
-    nm : 5,  // number of simultaneous simulations
+    nm : 10,  // number of simultaneous simulations
 
     // geometry
     H : 0.1, // (m)
     theta : 0,
-    half_width : [0],
     add_voids : "None",
 
     // material properties
-    mu : [0.5,1.0,2.0], // friction angle
+    mu : [1.0,0.5,2.0], // friction angle
     theta : 0.0,
     gsd_mode : 'mono',
     s_m : 0.001, // minimum particle size (m)
@@ -24,6 +23,6 @@
     IC_mode : "column",
     
     // saving
-    save_inc : 10,
-    t_f : 100.0,  // s
+    save_inc : 1,
+    t_f : 10.0,  // s
 }
