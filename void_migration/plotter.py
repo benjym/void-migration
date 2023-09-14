@@ -1,8 +1,16 @@
+import subprocess
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.colors import LinearSegmentedColormap
 import matplotlib.cm as cm
 import warnings
+
+def is_ffmpeg_installed():
+    try:
+        result = subprocess.run(["ffmpeg", "-version"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        return result.returncode == 0
+    except FileNotFoundError:
+        return False
 
 plt.inferno()
 cdict = {
@@ -236,3 +244,51 @@ def plot_T(x, y, s, T, p, t):
     plt.ylim(y[0], y[-1])
     plt.subplots_adjust(left=0, right=1, bottom=0, top=1)
     plt.savefig(p.folderName + "T_" + str(t).zfill(6) + ".png", dpi=100)
+
+def make_video(path, fps=30):
+    if is_ffmpeg_installed:
+        subprocess.run(["ffmpeg", "-y", "-i", f"{path}/nu_%06d.png", "-r", f"{fps}", f"{path}/nu_video.mp4"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        subprocess.run(["ffmpeg", "-y", "-i", f"{path}/s_%06d.png",  "-r", f"{fps}", f"{path}/s_video.mp4"],  stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    else:
+        print("ffmpeg not installed, cannot make videos")
+
+def stack_videos(paths, name):
+    if is_ffmpeg_installed:
+        cmd = ["ffmpeg", "-y"]
+        for f in paths:
+            cmd.extend(["-i", f"{f}/nu_video.mp4"])
+        cmd.extend(["-filter_complex",f"hstack=inputs={len(paths)}", "nu_videos.mp4"])
+        subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+        cmd = ["ffmpeg", "-y"]
+        for f in paths:
+            cmd.extend(["-i", f"{f}/s_video.mp4"])
+        cmd.extend(["-filter_complex",f"hstack=inputs={len(paths)}", "s_videos.mp4"])
+        subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            
+        cmd = ["ffmpeg","-y", "-i", "nu_videos.mp4", "-i", "s_videos.mp4", "-filter_complex", "vstack=inputs=2", f"{name}.mp4"]
+        subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+        subprocess.run(['rm', 'nu_videos.mp4', 's_videos.mp4'])
+    else:
+        print("ffmpeg not installed, cannot make videos")
+# ffmpeg -y -i output/collapse/mu_0.5/nu_%06d.png collapse_nu_05.mp4
+# ffmpeg -y -i output/collapse/mu_1.0/nu_%06d.png collapse_nu_10.mp4
+# ffmpeg -y -i output/collapse/mu_2.0/nu_%06d.png collapse_nu_20.mp4
+# ffmpeg -y -i output/collapse/mu_0.5/s_%06d.png collapse_s_05.mp4
+# ffmpeg -y -i output/collapse/mu_1.0/s_%06d.png collapse_s_10.mp4
+# ffmpeg -y -i output/collapse/mu_2.0/s_%06d.png collapse_s_20.mp4
+
+# ffmpeg -y -i collapse_nu_05.mp4 -i  collapse_nu_10.mp4 -i collapse_nu_20.mp4 -filter_complex vstack=inputs=3 collapse_nu_all.mp4
+# rm collapse_nu_05.mp4 collapse_nu_10.mp4 collapse_nu_20.mp4
+# ffmpeg -y -i collapse_s_05.mp4 -i  collapse_s_10.mp4 -i collapse_s_20.mp4 -filter_complex vstack=inputs=3 collapse_s_all.mp4
+# rm collapse_s_05.mp4 collapse_s_10.mp4 collapse_s_20.mp4
+# ffmpeg -y -i collapse_nu_all.mp4 -i collapse_s_all.mp4 -filter_complex hstack=inputs=2 collapse.mp4
+# rm collapse_nu_all.mp4 collapse_s_all.mp4
+
+# ffmpeg -y -i output/hopper/mu_0.1/half_width_3/nu_%06d.png hopper_nu_01.mp4
+# ffmpeg -y -i output/hopper/mu_1.0/half_width_3/nu_%06d.png hopper_nu_10.mp4
+# ffmpeg -y -i output/hopper/mu_10.0/half_width_3/nu_%06d.png hopper_nu_100.mp4
+# ffmpeg -y -i output/hopper/mu_0.1/half_width_3/s_%06d.png hopper_s_01.mp4
+# ffmpeg -y -i output/hopper/mu_1.0/half_width_3/s_%06d.png hopper_s_10.mp4
+# ffmpeg -y -i output/hopper/mu_10.0/half_width_3/s_%06d.png hopper_s_100.mp4

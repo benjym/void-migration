@@ -1,7 +1,5 @@
 #!/usr/bin/python
 
-import plotter
-
 __doc__ = """
 void_migration.py
 
@@ -17,7 +15,8 @@ from tqdm import tqdm
 import warnings
 import json5
 from itertools import product
-from numba import jit, njit
+# from numba import jit, njit
+import plotter
 
 from numpy.typing import ArrayLike
 
@@ -744,7 +743,7 @@ if __name__ == "__main__":
         p_init = dict_to_class(dict)
 
         all_sims = list(product(*p_init.lists))
-
+        folderNames = []
         for sim in tqdm(all_sims, desc="Sim", leave=False):
             folderName = f"output/{dict['input_filename']}/"
             dict_copy = dict.copy()
@@ -753,15 +752,9 @@ if __name__ == "__main__":
                 folderName += f"{key}_{sim[i]}/"
             p = dict_to_class(dict_copy)
             p.folderName = folderName
+            folderNames.append(folderName)
             time_march(p)
-
-        # for i in tqdm(p_init.mu, desc="Friction angle", disable=(len(p_init.mu) == 1)):
-        #     p.foldername += f"mu_{i}/"
-        #     for j in tqdm(
-        #         p_init.half_width, desc="Half width", leave=False, disable=(len(p_init.half_width) == 1)
-        #     ):
-        #         p = dict_to_class(dict)
-        #         p.mu = i
-        #         p.half_width = j
-        #         p.folderName = f"output/{p.input_filename}/mu_{i}/half_width_{j}/"
-        #         time_march(p)
+            videoName = f"{p.folderName}/video.mp4"
+            plotter.make_video(p.folderName)
+    
+    plotter.stack_videos(folderNames, dict["input_filename"])
