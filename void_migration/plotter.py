@@ -43,6 +43,10 @@ global fig, summary_fig
 
 def set_plot_size(p):
     global fig, summary_fig
+    
+    # wipe any existing figures
+    for i in plt.get_fignums(): plt.close(i)
+
     dpi = 20
     fig = plt.figure(figsize=[p.nx / dpi, p.ny / dpi])
     summary_fig = plt.figure()
@@ -126,6 +130,25 @@ def plot_nu(x, y, s, p, t):
     plt.ylim(y[0], y[-1])
     plt.subplots_adjust(left=0, right=1, bottom=0, top=1)
     plt.savefig(p.folderName + "nu_" + str(t).zfill(6) + ".png", dpi=100)
+
+def plot_relative_nu(x, y, s, p, t):
+    plt.figure(fig)
+    nu = 1 - np.mean(np.isnan(s), axis=2).T
+    nu /= p.critical_density
+    if p.internal_geometry:
+        nu = np.ma.masked_where(p.boundary.T, nu)
+    nu = np.ma.masked_where(nu == 0, nu)
+    plt.clf()
+    plt.pcolormesh(x, y, nu, cmap=bwr, vmin=0, vmax=2)
+    if p.internal_geometry:
+        if p.internal_geometry["perf_plate"]:
+            for i in p.internal_geometry["perf_pts"]:
+                plt.plot([x[i], x[i]], [y[0], y[-1]], "k--", linewidth=10)
+    plt.axis("off")
+    plt.xlim(x[0], x[-1])
+    plt.ylim(y[0], y[-1])
+    plt.subplots_adjust(left=0, right=1, bottom=0, top=1)
+    plt.savefig(p.folderName + "rel_nu_" + str(t).zfill(6) + ".png", dpi=100)
 
 
 def plot_u(x, y, s, u, v, p, t):
@@ -248,6 +271,7 @@ def plot_T(x, y, s, T, p, t):
 def make_video(path, fps=30):
     if is_ffmpeg_installed:
         subprocess.run(["ffmpeg", "-y", "-i", f"{path}/nu_%06d.png", "-r", f"{fps}", f"{path}/nu_video.mp4"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        subprocess.run(["ffmpeg", "-y", "-i", f"{path}/rel_nu_%06d.png", "-r", f"{fps}", f"{path}/rel_nu_video.mp4"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         subprocess.run(["ffmpeg", "-y", "-i", f"{path}/s_%06d.png",  "-r", f"{fps}", f"{path}/s_video.mp4"],  stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     else:
         print("ffmpeg not installed, cannot make videos")
@@ -262,11 +286,17 @@ def stack_videos(paths, name):
 
         cmd = ["ffmpeg", "-y"]
         for f in paths:
+            cmd.extend(["-i", f"{f}/rel_nu_video.mp4"])
+        cmd.extend(["-filter_complex",f"hstack=inputs={len(paths)}", "rel_nu_videos.mp4"])
+        subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+        cmd = ["ffmpeg", "-y"]
+        for f in paths:
             cmd.extend(["-i", f"{f}/s_video.mp4"])
         cmd.extend(["-filter_complex",f"hstack=inputs={len(paths)}", "s_videos.mp4"])
         subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             
-        cmd = ["ffmpeg","-y", "-i", "nu_videos.mp4", "-i", "s_videos.mp4", "-filter_complex", "vstack=inputs=2", f"{name}.mp4"]
+        cmd = ["ffmpeg","-y", "-i", "nu_videos.mp4", "-i", "rel_nu_videos.mp4", "-i", "s_videos.mp4", "-filter_complex", "vstack=inputs=3", f"{name}.mp4"]
         subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
         subprocess.run(['rm', 'nu_videos.mp4', 's_videos.mp4'])
