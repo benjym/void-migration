@@ -1,0 +1,30 @@
+{
+    // resolution
+    nx : 50, // width
+    ny : 25, // height
+    nm : 10,  // number of simultaneous simulations
+
+    // geometry
+    H : 0.1, // (m)
+    theta : 0,
+    add_voids : "None",
+
+    // material properties
+    mu : [1.0], // friction angle
+    theta : 0.0,
+    gsd_mode : 'mono',
+    s_m : 0.001, // minimum particle size (m)
+    critical_density : 0.5,
+    // diag: 1,
+    // Tg : float(sys.argv[4]),
+    
+    // initial condition:
+    fill_ratio : 0.25,
+    IC_mode : "column",
+    
+    // saving
+    save_inc : 1,
+    t_f : 10.0,  // s
+
+    swap_case : ['a','b','c','aORb','aANDb','aORc','aANDc','bORc','bANDc','aORbORc','aANDbANDc']
+}

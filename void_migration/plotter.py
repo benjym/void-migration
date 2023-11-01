@@ -299,7 +299,7 @@ def stack_videos(paths, name):
         cmd = ["ffmpeg","-y", "-i", "nu_videos.mp4", "-i", "rel_nu_videos.mp4", "-i", "s_videos.mp4", "-filter_complex", "vstack=inputs=3", f"{name}.mp4"]
         subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
-        subprocess.run(['rm', 'nu_videos.mp4', 's_videos.mp4'])
+        subprocess.run(['rm', 'nu_videos.mp4', 'rel_nu_videos.mp4', 's_videos.mp4'])
     else:
         print("ffmpeg not installed, cannot make videos")
 # ffmpeg -y -i output/collapse/mu_0.5/nu_%06d.png collapse_nu_05.mp4

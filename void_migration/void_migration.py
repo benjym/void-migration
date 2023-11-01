@@ -236,7 +236,41 @@ def density(s: np.ndarray, i: int, j: int) -> float:
     # return np.mean(~np.isnan(s[i, j, :]))
     return 1.0 - np.mean(np.isnan(s[i, j, :]))
 
+def swap_case(s: ArrayLike, i: int, j: int, A: float, lr: int, p: dict_to_class) -> bool:
+    """Determine whether a void should swap with a solid particle.
 
+    Args:
+        i: an integer representing a row index
+        j: an integer representing a column index
+        A: the proportion of the cell that should be filled diagonally up
+        lr: the direction of the swap. -1 for left, 0 for up, 1 for right
+
+    Returns:
+        True if the void should swap with a solid particle, False otherwise.
+    """
+    if p.swap_case == 'a': # up only
+        return density(s,i,j+1) < A
+    elif p.swap_case == 'b': # sideways only
+        return density(s,i+lr,j) < A
+    elif p.swap_case == 'c': # diagonal only
+        return density(s,i+lr,j+1) < A
+    elif p.swap_case == 'aORb': # up OR sideways
+        return density(s,i,j+1) < A or density(s,i+lr,j) < A
+    elif p.swap_case == 'aANDb': # up AND sideways
+        return density(s,i,j+1) < A and density(s,i+lr,j) < A
+    elif p.swap_case == 'aORc': # up OR diagonal
+        return density(s,i,j+1) < A or density(s,i+lr,j+1) < A
+    elif p.swap_case == 'aANDc': # up AND diagonal
+        return density(s,i,j+1) < A and density(s,i+lr,j+1) < A
+    elif p.swap_case == 'bORc': # sideways OR diagonal
+        return density(s,i+lr,j) < A or density(s,i+lr,j+1) < A
+    elif p.swap_case == 'bANDc': # sideways AND diagonal
+        return density(s,i+lr,j) < A and density(s,i+lr,j+1) < A
+    elif p.swap_case == 'aORbORc': # up OR sideways OR diagonal
+        return density(s,i,j+1) < A or density(s,i+lr,j) < A or density(s,i+lr,j+1) < A
+    elif p.swap_case == 'aANDbANDc': # sideways AND diagonal
+        return density(s,i,j+1) < A and density(s,i+lr,j) < A and density(s,i+lr,j+1) < A
+        
 # @njit
 def move_voids(
     u: ArrayLike,
@@ -275,16 +309,19 @@ def move_voids(
         A = 1.0 - 1.0 / (2.0 * p.mu)
 
     # print(f'A = {A}')
-
-    for j in range(p.ny - 2, -1, -1):
+    y_loop = np.arange(p.ny - 2, -1, -1)
+    np.random.shuffle(y_loop)
+    for j in y_loop:
         if p.internal_geometry:
             x_loop = np.arange(p.nx)[~p.boundary[:, j]]  # don't move apparent voids at boundaries
         else:
             x_loop = np.arange(p.nx)
         np.random.shuffle(x_loop)
         for i in x_loop:
-            if density(s, i, j) < p.critical_density:
-                for k in range(p.nm):
+            m_loop = np.arange(p.nm)
+            np.random.shuffle(m_loop)
+            for k in m_loop:
+                if density(s, i, j) < p.critical_density:
                     if np.isnan(s[i, j, k]):
                         # t_p = dy/sqrt(g*(H-y[j])) # local confinement timescale (s)
 
@@ -300,8 +337,9 @@ def move_voids(
                         if i > 0:
                             if (
                                 np.isnan(s[i - 1, j + diag, k])
+                                or swap_case(s,i,j,A,-1,p)
                                 # or density(s, i - 1, j + diag) < p.critical_density
-                                or density(s, i - 1, j + 1) <= A
+                                # or density(s, i - 1, j + 1) <= A
                                 # or density(s, i - 1, j + 1) <= A*p.critical_density
                             ):
                                 P_l = 0  # P_r + P_l = 1 at s=1
@@ -326,8 +364,9 @@ def move_voids(
                             # if ( not np.isnan(s[i+1,j,k]) and not np.isnan(s[i+1,j+1,k]) ): # RIGHT
                             if (
                                 np.isnan(s[i + 1, j + diag, k])
+                                or swap_case(s,i,j,A,1,p)
                                 # or density(s, i + 1, j + diag) < p.critical_density
-                                or density(s, i + 1, j + 1) <= A
+                                # or density(s, i + 1, j + 1) <= A
                                 # or density(s, i + 1, j + 1) <= A*p.critical_density
                             ):
                                 P_r = 0
@@ -587,6 +626,8 @@ def time_march(p):
         p.g = 9.81
     if not hasattr(p, "critical_density"):
         p.critical_density = 0.5
+    if not hasattr(p, "swap_case"):
+        p.swap_case = "c"
 
     plotter.set_plot_size(p)
 
@@ -661,6 +702,7 @@ def time_march(p):
 
     plotter.plot_s(x, y, s, p, t)
     plotter.plot_nu(x, y, s, p, t)
+    plotter.plot_relative_nu(x, y, s, p, t)
     plotter.plot_u(x, y, s, u, v, p, t)
     if hasattr(p, "concentration"):
         plotter.plot_c(x, y, s, c, p, t)
@@ -698,6 +740,7 @@ def time_march(p):
         if t % p.save_inc == 0:
             plotter.plot_s(x, y, s, p, t)
             plotter.plot_nu(x, y, s, p, t)
+            plotter.plot_relative_nu(x, y, s, p, t)
             plotter.plot_u(x, y, s, u, v, p, t)
 
             if hasattr(p, "concentration"):
@@ -721,6 +764,7 @@ def time_march(p):
         # print(" t = " + str(t * dt) + "                ", end="\r")
     plotter.plot_s(x, y, s, p, t)
     plotter.plot_nu(x, y, s, p, t)
+    plotter.plot_relative_nu(x, y, s, p, t)
     plotter.plot_u(x, y, s, u, v, p, t)
     plotter.plot_s_bar(y, s_bar_time, nu_time, p)
     plotter.plot_u_time(y, u_time, nu_time, p)
