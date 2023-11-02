@@ -5,12 +5,14 @@ from matplotlib.colors import LinearSegmentedColormap
 import matplotlib.cm as cm
 import warnings
 
+
 def is_ffmpeg_installed():
     try:
         result = subprocess.run(["ffmpeg", "-version"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         return result.returncode == 0
     except FileNotFoundError:
         return False
+
 
 plt.inferno()
 cdict = {
@@ -43,9 +45,10 @@ global fig, summary_fig
 
 def set_plot_size(p):
     global fig, summary_fig
-    
+
     # wipe any existing figures
-    for i in plt.get_fignums(): plt.close(i)
+    for i in plt.get_fignums():
+        plt.close(i)
 
     dpi = 20
     fig = plt.figure(figsize=[p.nx / dpi, p.ny / dpi])
@@ -130,6 +133,7 @@ def plot_nu(x, y, s, p, t):
     plt.ylim(y[0], y[-1])
     plt.subplots_adjust(left=0, right=1, bottom=0, top=1)
     plt.savefig(p.folderName + "nu_" + str(t).zfill(6) + ".png", dpi=100)
+
 
 def plot_relative_nu(x, y, s, p, t):
     plt.figure(fig)
@@ -268,40 +272,68 @@ def plot_T(x, y, s, T, p, t):
     plt.subplots_adjust(left=0, right=1, bottom=0, top=1)
     plt.savefig(p.folderName + "T_" + str(t).zfill(6) + ".png", dpi=100)
 
+
 def make_video(path, fps=30):
     if is_ffmpeg_installed:
-        subprocess.run(["ffmpeg", "-y", "-i", f"{path}/nu_%06d.png", "-r", f"{fps}", f"{path}/nu_video.mp4"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        subprocess.run(["ffmpeg", "-y", "-i", f"{path}/rel_nu_%06d.png", "-r", f"{fps}", f"{path}/rel_nu_video.mp4"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        subprocess.run(["ffmpeg", "-y", "-i", f"{path}/s_%06d.png",  "-r", f"{fps}", f"{path}/s_video.mp4"],  stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        subprocess.run(
+            ["ffmpeg", "-y", "-i", f"{path}/nu_%06d.png", "-r", f"{fps}", f"{path}/nu_video.mp4"],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        subprocess.run(
+            ["ffmpeg", "-y", "-i", f"{path}/rel_nu_%06d.png", "-r", f"{fps}", f"{path}/rel_nu_video.mp4"],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        subprocess.run(
+            ["ffmpeg", "-y", "-i", f"{path}/s_%06d.png", "-r", f"{fps}", f"{path}/s_video.mp4"],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
     else:
         print("ffmpeg not installed, cannot make videos")
+
 
 def stack_videos(paths, name):
     if is_ffmpeg_installed:
         cmd = ["ffmpeg", "-y"]
         for f in paths:
             cmd.extend(["-i", f"{f}/nu_video.mp4"])
-        cmd.extend(["-filter_complex",f"hstack=inputs={len(paths)}", "nu_videos.mp4"])
+        cmd.extend(["-filter_complex", f"hstack=inputs={len(paths)}", "nu_videos.mp4"])
         subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
         cmd = ["ffmpeg", "-y"]
         for f in paths:
             cmd.extend(["-i", f"{f}/rel_nu_video.mp4"])
-        cmd.extend(["-filter_complex",f"hstack=inputs={len(paths)}", "rel_nu_videos.mp4"])
+        cmd.extend(["-filter_complex", f"hstack=inputs={len(paths)}", "rel_nu_videos.mp4"])
         subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
         cmd = ["ffmpeg", "-y"]
         for f in paths:
             cmd.extend(["-i", f"{f}/s_video.mp4"])
-        cmd.extend(["-filter_complex",f"hstack=inputs={len(paths)}", "s_videos.mp4"])
-        subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            
-        cmd = ["ffmpeg","-y", "-i", "nu_videos.mp4", "-i", "rel_nu_videos.mp4", "-i", "s_videos.mp4", "-filter_complex", "vstack=inputs=3", f"{name}.mp4"]
+        cmd.extend(["-filter_complex", f"hstack=inputs={len(paths)}", "s_videos.mp4"])
         subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
-        subprocess.run(['rm', 'nu_videos.mp4', 'rel_nu_videos.mp4', 's_videos.mp4'])
+        cmd = [
+            "ffmpeg",
+            "-y",
+            "-i",
+            "nu_videos.mp4",
+            "-i",
+            "rel_nu_videos.mp4",
+            "-i",
+            "s_videos.mp4",
+            "-filter_complex",
+            "vstack=inputs=3",
+            f"{name}.mp4",
+        ]
+        subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+        subprocess.run(["rm", "nu_videos.mp4", "rel_nu_videos.mp4", "s_videos.mp4"])
     else:
         print("ffmpeg not installed, cannot make videos")
+
+
 # ffmpeg -y -i output/collapse/mu_0.5/nu_%06d.png collapse_nu_05.mp4
 # ffmpeg -y -i output/collapse/mu_1.0/nu_%06d.png collapse_nu_10.mp4
 # ffmpeg -y -i output/collapse/mu_2.0/nu_%06d.png collapse_nu_20.mp4

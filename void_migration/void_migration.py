@@ -15,6 +15,7 @@ from tqdm import tqdm
 import warnings
 import json5
 from itertools import product
+
 # from numba import jit, njit
 import plotter
 
@@ -203,6 +204,7 @@ def move_voids_diff(u, v, s, c, T, p):  # Diffusion
                                     A = p.mu / 2.0  # proportion of cell that should be filled diagonally up
                                 else:
                                     A = 1.0 - 1.0 / (2.0 * p.mu)
+                                # A *= p.critical_density
                                 if (
                                     np.mean(~np.isnan(s[i + lr, j + 1, :])) > A
                                 ):  # this sets an angle of repose?
@@ -236,8 +238,10 @@ def density(s: np.ndarray, i: int, j: int) -> float:
     # return np.mean(~np.isnan(s[i, j, :]))
     return 1.0 - np.mean(np.isnan(s[i, j, :]))
 
+
 def swap_case(s: ArrayLike, i: int, j: int, A: float, lr: int, p: dict_to_class) -> bool:
-    """Determine whether a void should swap with a solid particle.
+    """Determine whether a void should swap with a solid particle. Three potential directions on the grid to check.
+    'a' represents vertically above, 'b' to the side and 'c' diagonally up.
 
     Args:
         i: an integer representing a row index
@@ -248,29 +252,30 @@ def swap_case(s: ArrayLike, i: int, j: int, A: float, lr: int, p: dict_to_class)
     Returns:
         True if the void should swap with a solid particle, False otherwise.
     """
-    if p.swap_case == 'a': # up only
-        return density(s,i,j+1) < A
-    elif p.swap_case == 'b': # sideways only
-        return density(s,i+lr,j) < A
-    elif p.swap_case == 'c': # diagonal only
-        return density(s,i+lr,j+1) < A
-    elif p.swap_case == 'aORb': # up OR sideways
-        return density(s,i,j+1) < A or density(s,i+lr,j) < A
-    elif p.swap_case == 'aANDb': # up AND sideways
-        return density(s,i,j+1) < A and density(s,i+lr,j) < A
-    elif p.swap_case == 'aORc': # up OR diagonal
-        return density(s,i,j+1) < A or density(s,i+lr,j+1) < A
-    elif p.swap_case == 'aANDc': # up AND diagonal
-        return density(s,i,j+1) < A and density(s,i+lr,j+1) < A
-    elif p.swap_case == 'bORc': # sideways OR diagonal
-        return density(s,i+lr,j) < A or density(s,i+lr,j+1) < A
-    elif p.swap_case == 'bANDc': # sideways AND diagonal
-        return density(s,i+lr,j) < A and density(s,i+lr,j+1) < A
-    elif p.swap_case == 'aORbORc': # up OR sideways OR diagonal
-        return density(s,i,j+1) < A or density(s,i+lr,j) < A or density(s,i+lr,j+1) < A
-    elif p.swap_case == 'aANDbANDc': # sideways AND diagonal
-        return density(s,i,j+1) < A and density(s,i+lr,j) < A and density(s,i+lr,j+1) < A
-        
+    if p.swap_case == "a":  # up only
+        return density(s, i, j + 1) < A
+    elif p.swap_case == "b":  # sideways only
+        return density(s, i + lr, j) < A
+    elif p.swap_case == "c":  # diagonal only
+        return density(s, i + lr, j + 1) < A
+    elif p.swap_case == "aORb":  # up OR sideways
+        return density(s, i, j + 1) < A or density(s, i + lr, j) < A
+    elif p.swap_case == "aANDb":  # up AND sideways
+        return density(s, i, j + 1) < A and density(s, i + lr, j) < A
+    elif p.swap_case == "aORc":  # up OR diagonal
+        return density(s, i, j + 1) < A or density(s, i + lr, j + 1) < A
+    elif p.swap_case == "aANDc":  # up AND diagonal
+        return density(s, i, j + 1) < A and density(s, i + lr, j + 1) < A
+    elif p.swap_case == "bORc":  # sideways OR diagonal
+        return density(s, i + lr, j) < A or density(s, i + lr, j + 1) < A
+    elif p.swap_case == "bANDc":  # sideways AND diagonal
+        return density(s, i + lr, j) < A and density(s, i + lr, j + 1) < A
+    elif p.swap_case == "aORbORc":  # up OR sideways OR diagonal
+        return density(s, i, j + 1) < A or density(s, i + lr, j) < A or density(s, i + lr, j + 1) < A
+    elif p.swap_case == "aANDbANDc":  # sideways AND diagonal
+        return density(s, i, j + 1) < A and density(s, i + lr, j) < A and density(s, i + lr, j + 1) < A
+
+
 # @njit
 def move_voids(
     u: ArrayLike,
@@ -301,13 +306,15 @@ def move_voids(
         T: The updated temperature field
     """
 
-    # A is the proportion of the cell that should be filled diagonally up
+    # A is the proportion of the cell that should be filled when at angle of repose
     # Comes from a simple geometric argument where the slope goes through one corner of the cell
     if p.mu < 1:
         A = p.mu / 2.0  # proportion of cell that should be filled where the slope goes through one corner
     else:
         A = 1.0 - 1.0 / (2.0 * p.mu)
-
+    A *= p.critical_density
+    # A = 0
+    # A = p.mu
     # print(f'A = {A}')
     y_loop = np.arange(p.ny - 2, -1, -1)
     np.random.shuffle(y_loop)
@@ -335,13 +342,7 @@ def move_voids(
 
                         # LEFT
                         if i > 0:
-                            if (
-                                np.isnan(s[i - 1, j + diag, k])
-                                or swap_case(s,i,j,A,-1,p)
-                                # or density(s, i - 1, j + diag) < p.critical_density
-                                # or density(s, i - 1, j + 1) <= A
-                                # or density(s, i - 1, j + 1) <= A*p.critical_density
-                            ):
+                            if np.isnan(s[i - 1, j + diag, k]) or swap_case(s, i, j, A, -1, p):
                                 P_l = 0  # P_r + P_l = 1 at s=1
                             else:
                                 P_l = (0.5 + 0.5 * np.sin(np.radians(p.theta))) / s[i - 1, j + diag, k]
@@ -362,13 +363,7 @@ def move_voids(
                         # RIGHT
                         if i + 1 < p.nx:
                             # if ( not np.isnan(s[i+1,j,k]) and not np.isnan(s[i+1,j+1,k]) ): # RIGHT
-                            if (
-                                np.isnan(s[i + 1, j + diag, k])
-                                or swap_case(s,i,j,A,1,p)
-                                # or density(s, i + 1, j + diag) < p.critical_density
-                                # or density(s, i + 1, j + 1) <= A
-                                # or density(s, i + 1, j + 1) <= A*p.critical_density
-                            ):
+                            if np.isnan(s[i + 1, j + diag, k]) or swap_case(s, i, j, A, 1, p):
                                 P_r = 0
                             else:
                                 P_r = (0.5 - 0.5 * np.sin(np.radians(p.theta))) / s[i + 1, j + diag, k]
@@ -627,7 +622,7 @@ def time_march(p):
     if not hasattr(p, "critical_density"):
         p.critical_density = 0.5
     if not hasattr(p, "swap_case"):
-        p.swap_case = "c"
+        p.swap_case = "bORc"
 
     plotter.set_plot_size(p)
 
@@ -642,7 +637,7 @@ def time_march(p):
     p.t_p = p.s_m / np.sqrt(p.g * p.H)  # smallest confinement timescale (at bottom) (s)
     p.free_fall_velocity = np.sqrt(p.g * p.s_m)
 
-    p.swap_rate = np.sqrt(4 * p.mu)
+    p.swap_rate = 1 # np.sqrt(4 * p.mu) # FIXME
 
     # P_scaling = (p.mu**2) / 2.0
     # if P_scaling > 1:  # SOLVED: both swapping probabilities guaranteed to be less than or equal to 0.5
@@ -800,5 +795,5 @@ if __name__ == "__main__":
             time_march(p)
             videoName = f"{p.folderName}/video.mp4"
             plotter.make_video(p.folderName)
-    
+
     plotter.stack_videos(folderNames, dict["input_filename"])
