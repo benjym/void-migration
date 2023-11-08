@@ -6,39 +6,19 @@ void_migration.py
 This script simulates ....
 """
 __author__ = "Benjy Marks"
-__version__ = "0.1"
+__version__ = "0.3"
 
-import os
 import sys
 import numpy as np
 from tqdm import tqdm
-import warnings
-import json5
 from itertools import product
+from numpy.typing import ArrayLike
 
 # from numba import jit, njit
 import plotter
-
-from numpy.typing import ArrayLike
-
-# warnings.filterwarnings("ignore")
-
-
-class dict_to_class:
-    """
-    A convenience class to store the information from the parameters dictionary. Used because I prefer using p.variable to p['variable'].
-    """
-
-    def __init__(self, dict: dict):
-        list_keys: List[str] = []
-        lists: List[List] = []
-        for key in dict:
-            setattr(self, key, dict[key])
-            if isinstance(dict[key], list):
-                list_keys.append(key)
-                lists.append(dict[key])
-        setattr(self, "lists", lists)
-        setattr(self, "list_keys", list_keys)
+import params
+import operators
+import thermal
 
 
 def IC(p):
@@ -54,7 +34,7 @@ def IC(p):
 
     # pick a grain size distribution
     if p.gsd_mode == "mono":
-        s = np.ones([p.nx, p.ny, p.nm])  # monodisperse
+        s = p.s_m * np.ones([p.nx, p.ny, p.nm])  # monodisperse
         p.s_M = p.s_m
     if p.gsd_mode == "bi":  # bidisperse
         s = np.random.choice([p.s_m, p.s_M], size=[p.nx, p.ny, p.nm])
@@ -85,195 +65,49 @@ def IC(p):
     return s
 
 
-def move_voids_adv(u, v, s, c, T, p):  # Advection
-    """
-    Deprecated function. Do not use.
-    """
-    for j in range(p.ny - 2, -1, -1):
-        x_loop = np.arange(p.nx)
-        if p.internal_geometry:
-            x_loop = x_loop[~p.boundary[:, j]]  # don't move apparent voids at boundaries
-        np.random.shuffle(x_loop)
-        for i in x_loop:
-            for k in range(p.nm):
-                if np.isnan(s[i, j, k]):
-                    if np.random.rand() < p.P_adv:
-                        if not np.isnan(s[i, j + 1, k]):
-                            # if p.internal_geometry:
-                            # if not p.boundary[i, j + 1]:
-                            s[i, j, k], s[i, j + 1, k] = s[i, j + 1, k], s[i, j, k]
-                            v[i, j] += 1
-                            if T is not None:
-                                T[i, j, k], T[i, j + 1, k] = T[i, j + 1, k], T[i, j, k]
-    return u, v, s, c, T
-
-
-def move_voids_diff(u, v, s, c, T, p):  # Diffusion
-    """
-    Deprecated function. Do not use.
-    """
-    for j in range(p.ny - 2, -1, -1):
-        x_loop = np.arange(p.nx)
-        if p.internal_geometry:
-            x_loop = x_loop[~p.boundary[:, j]]  # don't move apparent voids at boundaries
-        np.random.shuffle(x_loop)
-        for i in x_loop:
-            for k in range(p.nm):
-                if np.isnan(s[i, j, k]):
-                    if np.random.rand() < p.P_diff:
-                        # CAN MAKE SEG BY SETTING PROBABILITY OF lr TO DEPEND ON SIZE RATIO
-                        # lr = np.random.rand() < 1./(1. + s[i-1,j,k]/s[i+1,j,k] ) # just segregation
-                        # lr = np.random.rand() < 0.5*(1 - np.sin(radians(theta))) # just slope
-                        if i == 0:
-                            if p.cyclic_BC:
-                                lr = np.random.rand() < (1 - np.sin(np.radians(p.theta))) / (
-                                    1
-                                    - np.sin(np.radians(p.theta))
-                                    + (1 + np.sin(np.radians(p.theta))) * (s[-1, j, k] / s[1, j, k])
-                                )  # both together
-                                lr = 2 * lr - 1  # rescale to +/- 1
-                            else:
-                                lr = 1
-                        elif i == p.nx - 1:
-                            if p.cyclic_BC:
-                                lr = np.random.rand() < (1 - np.sin(np.radians(p.theta))) / (
-                                    1
-                                    - np.sin(np.radians(p.theta))
-                                    + (1 + np.sin(np.radians(p.theta))) * (s[-2, j, k] / s[0, j, k])
-                                )  # both together
-                                lr = 2 * lr - 1  # rescale to +/- 1
-                            else:
-                                lr = -1
-                        else:
-                            if p.boundary[i - 1, j]:
-                                l = 1e10  # zero chance of moving there
-                            else:
-                                l = s[i - 1, j, k]
-                            if p.boundary[i + 1, j]:
-                                r = 1e10  # zero chance of moving there
-                            else:
-                                r = s[i + 1, j, k]
-
-                            lr = np.random.rand() < (1 - np.sin(np.radians(p.theta))) / (
-                                1 - np.sin(np.radians(p.theta)) + (1 + np.sin(np.radians(p.theta))) * (l / r)
-                            )  # both together
-                            # print(
-                            #     s[i - 1, j, k],
-                            #     s[i, j, k],
-                            #     s[i + 1, j, k],
-                            #     (1 - np.sin(np.radians(p.theta)))
-                            #     / (1 - np.sin(np.radians(p.theta)) + (1 + np.sin(np.radians(p.theta))) * (l / r)),
-                            # )
-                            lr = 2 * lr - 1  # rescale to +/- 1
-
-                        if i == p.nx - 1 and lr == 1:  # right boundary
-                            if p.cyclic_BC:
-                                # if not np.isnan(s[0,j+1,k]): # this sets the angle of repose?
-                                if not np.isnan(s[0, j, k]):
-                                    s[-1, j, k], s[0, j, k] = s[0, j, k], s[-1, j, k]
-                                    u[i, j] -= lr
-                                    if T is not None:
-                                        T[-1, j, k], T[0, j, k] = T[0, j, k], T[-1, j, k]
-                        elif i == 0 and lr == -1:  # left boundary
-                            if p.cyclic_BC:
-                                # if not np.isnan(s[i+lr,j+1,k]): # this sets the angle of repose?
-                                if not np.isnan(s[-1, j, k]):
-                                    s[0, j, k], s[-1, j, k] = s[-1, j, k], s[0, j, k]
-                                    u[i, j] -= lr
-                                    if T is not None:
-                                        T[0, j, k], T[-1, j, k] = T[-1, j, k], T[0, j, k]
-                        else:
-                            if not np.isnan(s[i + lr, j, k]):
-                                print(
-                                    l,
-                                    r,
-                                    s[i - 1, j, k],
-                                    s[i, j, k],
-                                    s[i + 1, j, k],
-                                    (1 - np.sin(np.radians(p.theta)))
-                                    / (
-                                        1
-                                        - np.sin(np.radians(p.theta))
-                                        + (1 + np.sin(np.radians(p.theta))) * (l / r)
-                                    ),
-                                )
-                                # if not np.isnan(s[i+lr,j+1,k]): # this sets the angle of repose at 45
-                                # if np.mean(np.isnan(s[i, j, :])) > 0.5:  # if here is mostly empty (ie outside mass)
-                                # print('outside')
-                                if p.mu < 1:
-                                    A = p.mu / 2.0  # proportion of cell that should be filled diagonally up
-                                else:
-                                    A = 1.0 - 1.0 / (2.0 * p.mu)
-                                # A *= p.critical_density
-                                if (
-                                    np.mean(~np.isnan(s[i + lr, j + 1, :])) > A
-                                ):  # this sets an angle of repose?
-                                    s[i, j, k], s[i + lr, j, k] = s[i + lr, j, k], s[i, j, k]
-                                    u[i, j] -= lr
-                                    if T is not None:
-                                        T[i, j, k], T[i + lr, j, k] = T[i + lr, j, k], T[i, j, k]
-                                # else:  # not more than 50% voids, inside mass
-                                #     # print('inside')
-                                #     # if p.internal_geometry and not boundary[i + lr, j]:
-                                #     # if not boundary[i + lr, j]:
-                                #     s[i, j, k], s[i + lr, j, k] = s[i + lr, j, k], s[i, j, k]
-                                #     u[i, j] -= lr
-                                #     if T is not None:
-                                #         T[i, j, k], T[i + lr, j, k] = T[i + lr, j, k], T[i, j, k]
-
-    return u, v, s, c, T
-
-
-def density(s: np.ndarray, i: int, j: int) -> float:
-    """Calculate density of a single physical in a 3D array.
-
-    Args:
-        s: a 3D numpy array
-        i: an integer representing a row index
-        j: an integer representing a column index
-
-    Returns:
-        The density of the solid phase in s at (i, j) as a float.
-    """
-    # return np.mean(~np.isnan(s[i, j, :]))
-    return 1.0 - np.mean(np.isnan(s[i, j, :]))
-
-
-def swap_case(s: ArrayLike, i: int, j: int, A: float, lr: int, p: dict_to_class) -> bool:
-    """Determine whether a void should swap with a solid particle. Three potential directions on the grid to check.
-    'a' represents vertically above, 'b' to the side and 'c' diagonally up.
+def stable_slope(
+    s: ArrayLike,
+    i: int,
+    j: int,
+    dest: int,
+    p: params.dict_to_class,
+    nu: ArrayLike,
+    dnu_dx: ArrayLike,
+    dnu_dy: ArrayLike,
+) -> bool:
+    """Determine whether a void should swap with a solid particle.
 
     Args:
         i: an integer representing a row index
         j: an integer representing a column index
-        A: the proportion of the cell that should be filled diagonally up
-        lr: the direction of the swap. -1 for left, 0 for up, 1 for right
+        lr: the cell we want to move into
 
     Returns:
-        True if the void should swap with a solid particle, False otherwise.
+        True if the void should NOT swap with a solid particle (i.e. the slope is stable). False otherwise.
     """
-    if p.swap_case == "a":  # up only
-        return density(s, i, j + 1) < A
-    elif p.swap_case == "b":  # sideways only
-        return density(s, i + lr, j) < A
-    elif p.swap_case == "c":  # diagonal only
-        return density(s, i + lr, j + 1) < A
-    elif p.swap_case == "aORb":  # up OR sideways
-        return density(s, i, j + 1) < A or density(s, i + lr, j) < A
-    elif p.swap_case == "aANDb":  # up AND sideways
-        return density(s, i, j + 1) < A and density(s, i + lr, j) < A
-    elif p.swap_case == "aORc":  # up OR diagonal
-        return density(s, i, j + 1) < A or density(s, i + lr, j + 1) < A
-    elif p.swap_case == "aANDc":  # up AND diagonal
-        return density(s, i, j + 1) < A and density(s, i + lr, j + 1) < A
-    elif p.swap_case == "bORc":  # sideways OR diagonal
-        return density(s, i + lr, j) < A or density(s, i + lr, j + 1) < A
-    elif p.swap_case == "bANDc":  # sideways AND diagonal
-        return density(s, i + lr, j) < A and density(s, i + lr, j + 1) < A
-    elif p.swap_case == "aORbORc":  # up OR sideways OR diagonal
-        return density(s, i, j + 1) < A or density(s, i + lr, j) < A or density(s, i + lr, j + 1) < A
-    elif p.swap_case == "aANDbANDc":  # sideways AND diagonal
-        return density(s, i, j + 1) < A and density(s, i + lr, j) < A and density(s, i + lr, j + 1) < A
+    # if p.mu <= 1:
+    # if (
+    #     solid_fraction(s, i + lr, j) - solid_fraction(s, i - lr, j)
+    # ) < p.mu * p.nu_cs:# and (
+    if ((nu[dest, j] > nu[i, j]) and (nu[dest, j] - nu[i, j]) < p.mu * p.nu_cs) and (
+        nu[i, j + 1] == 0
+    ):  # where did the 2 come from???
+        # print('STABLE')
+        return True
+    else:
+        return False
+    # else:
+    # if (
+    #     solid_fraction(s, i + lr, j+1) - solid_fraction(s, i - lr, j-1) + 2
+    # ) < 2*p.mu * p.nu_cs:  # HACK - WHY IS IT NOT DIVIDED BY 2??
+    #     return True
+    # sys.exit('Friction angles above 45 degrees not yet implemented')
+
+    # print(dnu_dx[i,j])
+    # if np.abs(dnu_dx[i,j]) < p.mu*p.nu_cs/2.:
+    #     return True
+    # else:
+    #     return False
 
 
 # @njit
@@ -281,10 +115,11 @@ def move_voids(
     u: ArrayLike,
     v: ArrayLike,
     s: ArrayLike,
-    p: dict_to_class,
+    p: params.dict_to_class,
     diag: int = 0,
     c: None | ArrayLike = None,
     T: None | ArrayLike = None,
+    N_swap: None | ArrayLike = None,
 ) -> tuple[ArrayLike, ArrayLike, ArrayLike, None | ArrayLike, None | ArrayLike]:
     """
     Function to move voids each timestep.
@@ -306,136 +141,162 @@ def move_voids(
         T: The updated temperature field
     """
 
-    # A is the proportion of the cell that should be filled when at angle of repose
-    # Comes from a simple geometric argument where the slope goes through one corner of the cell
-    if p.mu < 1:
-        A = p.mu / 2.0  # proportion of cell that should be filled where the slope goes through one corner
-    else:
-        A = 1.0 - 1.0 / (2.0 * p.mu)
-    A *= p.critical_density
-    # A = 0
-    # A = p.mu
-    # print(f'A = {A}')
-    y_loop = np.arange(p.ny - 2, -1, -1)
-    np.random.shuffle(y_loop)
-    for j in y_loop:
-        if p.internal_geometry:
-            x_loop = np.arange(p.nx)[~p.boundary[:, j]]  # don't move apparent voids at boundaries
-        else:
-            x_loop = np.arange(p.nx)
-        np.random.shuffle(x_loop)
-        for i in x_loop:
-            m_loop = np.arange(p.nm)
-            np.random.shuffle(m_loop)
-            for k in m_loop:
-                if density(s, i, j) < p.critical_density:
-                    if np.isnan(s[i, j, k]):
-                        # t_p = dy/sqrt(g*(H-y[j])) # local confinement timescale (s)
+    # if p.swap_rate == "constant":
+    #     swap_rate = np.ones_like(s[:, :, 0])
+    # if N_swap is None:
+    #     swap_rate = np.ones_like(s[:, :, 0])
+    # else:
+    #     e = 0.8
+    #     s_bar = get_hyperbolic_average(s)
+    #     nu = 1.0 - np.mean(np.isnan(s[:, :, :]), axis=2)
+    #     nu_RCP = 0.64
+    #     nu_F = p.nu_cs
+    #     Tg = N_swap/p.nm*p.dy*p.dy/(p.dt*p.dt)
+    #     D_KT = np.sqrt(np.pi)/(8*(1+e))*s_bar/(nu*5.6916*(nu_RCP-nu_F)/(nu_RCP-nu))*np.sqrt(Tg)
+    #     swap_rate = D_KT*2*p.dt/(p.dy*p.dy)
+    #     # print(np.nanmin(swap_rate),np.nanmax(swap_rate))
+    #     # import matplotlib.pyplot as plt
+    #     # plt.figure(99)
+    #     # plt.clf()
+    #     # plt.ion()
+    #     # plt.imshow(N_swap)
+    #     # plt.colorbar()
+    #     # plt.pause(1)
 
-                        # if np.random.rand() < p.free_fall_velocity*p.dt/p.dy:
+    # N_swap = np.ones_like(s[:, :, 0]) # HACK - SET NON-ZERO Tg EVERYWHERE FOR TESTING
 
-                        # UP
-                        if np.isnan(s[i, j + 1, k]):
-                            P_u = 0
+    # y_loop = np.arange(p.ny - 2, -1, -1)
+    # np.random.shuffle(y_loop)
+    # for j in y_loop:
+    #     if p.internal_geometry:
+    #         x_loop = np.arange(p.nx)[~p.boundary[:, j]]  # don't move apparent voids at boundaries
+    #     else:
+    #         x_loop = np.arange(p.nx)
+    #     np.random.shuffle(x_loop)
+    #     for i in x_loop:
+    #         m_loop = np.arange(p.nm)
+    #         np.random.shuffle(m_loop)
+    #         for k in m_loop:
+    nu = 1.0 - np.mean(np.isnan(s[:, :, :]), axis=2)
+    dnu_dx, dnu_dy = np.gradient(nu)
+
+    s_inv_bar = operators.get_hyperbolic_average(
+        s
+    )  # HACK: SHOULD RECALCULATE AFTER EVERY SWAP — WILL BE SUPER SLOW??
+    s_inv_bar[np.isnan(s_inv_bar)] = 1.0 / (1.0 / p.s_m + 1.0 / p.s_M)  # FIXME
+
+    indices = np.arange(p.nx * (p.ny - 1) * p.nm)
+    np.random.shuffle(indices)
+    for index in indices:
+        i, j, k = np.unravel_index(index, [p.nx, p.ny - 1, p.nm])
+        if nu[i, j] < p.nu_cs:  # the material is a liquid (below critical solid fraction)
+            # if ((nu[i, j] < p.nu_cs) and (np.abs(dnu_dx[i,j]) > p.mu*p.nu_cs/2.)):  # the material is a liquid (below critical solid fraction AND slope is high)
+            if np.isnan(s[i, j, k]):
+                # print(s_inv_bar[i,j])
+
+                # t_p = dy/sqrt(g*(H-y[j])) # local confinement timescale (s)
+
+                # if np.random.rand() < p.free_fall_velocity*p.dt/p.dy:
+
+                # UP
+                if np.isnan(s[i, j + 1, k]):
+                    P_u = 0
+                else:
+                    P_u = p.P_u_ref * (s_inv_bar[i, j] / s[i, j + 1, k])
+
+                # LEFT
+                if i == 0:
+                    if p.cyclic_BC:
+                        l = -1
+                    else:
+                        l = i  # will force P_l to be zero at boundary
+                else:
+                    l = i - 1
+
+                # if np.isnan(s[l, j + diag, k]):
+                if np.isnan(s[l, j + diag, k]) or stable_slope(s, i, j, l, p, nu, dnu_dx, dnu_dy):
+                    P_l = 0  # P_r + P_l = 1 at s=1
+                else:
+                    # P_l = (0.5 + 0.5 * np.sin(np.radians(p.theta))) / (s[l, j + diag, k]/s_inv_bar[i,j])
+                    P_l = p.P_lr_ref * (s_inv_bar[i, j] / s[l, j + diag, k])
+
+                # if hasattr(p, "internal_geometry"):
+                #     if p.boundary[l, j + diag]:
+                #         P_l *= p.internal_geometry["perf_rate"]
+                # if perf_plate and i-1==perf_pts[0]: P_l *= perf_rate
+                # if perf_plate and i-1==perf_pts[1]: P_l *= perf_rate
+
+                # RIGHT
+                if i == p.nx - 1:
+                    if p.cyclic_BC:
+                        r = 0
+                    else:
+                        r = i  # will force P_r to be zero at boundary
+                else:
+                    r = i + 1
+
+                # if np.isnan(s[r, j + diag, k]):
+                if np.isnan(s[r, j + diag, k]) or stable_slope(s, i, j, r, p, nu, dnu_dx, dnu_dy):
+                    P_r = 0
+                else:
+                    # P_r = (0.5 - 0.5 * np.sin(np.radians(p.theta))) / (s[r, j + diag, k]/s_inv_bar[i,j])
+                    P_r = p.P_lr_ref * (s_inv_bar[i, j] / s[r, j + diag, k])
+
+                # if p.internal_geometry:
+                #     if p.boundary[r, j + diag]:
+                #         P_r *= p.internal_geometry["perf_rate"]
+                # if perf_plate and i+1==perf_pts[0]: P_r *= perf_rate
+                # if perf_plate and i+1==perf_pts[1]: P_r *= perf_rate
+
+                P_tot = P_u + P_l + P_r
+                # print(P_tot)
+                if P_tot > 1:
+                    print(f"Error: P_tot > 1, P_u = {P_u}, P_l = {P_l}, P_r = {P_r}")
+
+                dest = None
+                if P_tot > 0:
+                    P = np.random.rand()
+                    if P < P_u and P_u > 0:  # go up
+                        dest = [i, j + 1, k]
+                        # v[i, j] += 1
+                        if not np.isnan(s[i, j + 1, k]):
+                            v[i, j] += 1
+                    elif P < (P_l + P_u):  # go left
+                        dest = [l, j + diag, k]
+
+                        if diag == 0:
+                            u[i, j] += 1  # LEFT
+                            v[i, j] += 1
                         else:
-                            P_u = 1.0 / p.swap_rate / s[i, j + 1, k]  # FIXME ????
+                            u[i, j] += np.sqrt(2)  # UP LEFT
+                            v[i, j] += np.sqrt(2)
+                    elif P < P_tot:  # go right
+                        dest = [r, j + diag, k]
 
-                        # LEFT
-                        if i > 0:
-                            if np.isnan(s[i - 1, j + diag, k]) or swap_case(s, i, j, A, -1, p):
-                                P_l = 0  # P_r + P_l = 1 at s=1
-                            else:
-                                P_l = (0.5 + 0.5 * np.sin(np.radians(p.theta))) / s[i - 1, j + diag, k]
-
-                            if hasattr(p, "internal_geometry"):
-                                if p.boundary[i - 1, j + diag]:
-                                    P_l *= p.internal_geometry["perf_rate"]
-                            # if perf_plate and i-1==perf_pts[0]: P_l *= perf_rate
-                            # if perf_plate and i-1==perf_pts[1]: P_l *= perf_rate
-                        elif p.cyclic_BC:
-                            if np.isnan(s[-1, j + diag, k]):
-                                P_l = 0  # UP LEFT
-                            else:
-                                P_l = (0.5 + 0.5 * np.sin(np.radians(p.theta))) / s[-1, j + diag, k]
+                        if diag == 0:
+                            u[i, j] -= 1  # RIGHT
+                            v[i, j] += 1
                         else:
-                            P_l = 0
+                            u[i, j] -= np.sqrt(2)  # UP RIGHT
+                            v[i, j] += np.sqrt(2)
+                    else:
+                        pass
+                        # print('NOTHING')
 
-                        # RIGHT
-                        if i + 1 < p.nx:
-                            # if ( not np.isnan(s[i+1,j,k]) and not np.isnan(s[i+1,j+1,k]) ): # RIGHT
-                            if np.isnan(s[i + 1, j + diag, k]) or swap_case(s, i, j, A, 1, p):
-                                P_r = 0
-                            else:
-                                P_r = (0.5 - 0.5 * np.sin(np.radians(p.theta))) / s[i + 1, j + diag, k]
+                    if dest is not None:
+                        s, c, T, nu = operators.swap([i, j, k], dest, [s, c, T], nu, p)
 
-                            if p.internal_geometry:
-                                if p.boundary[i + 1, j + diag]:
-                                    P_r *= p.internal_geometry["perf_rate"]
-                            # if perf_plate and i+1==perf_pts[0]: P_r *= perf_rate
-                            # if perf_plate and i+1==perf_pts[1]: P_r *= perf_rate
-                        elif p.cyclic_BC:
-                            if np.isnan(s[0, j + diag, k]):
-                                P_r = 0
-                            else:
-                                P_r = (0.5 - 0.5 * np.sin(np.radians(p.theta))) / s[0, j + diag, k]
-                        else:
-                            P_r = 0
+                    # N_swap[i, j] += 1
+                    # N_swap[dest[0],dest[1]] += 1
 
-                        P_tot = P_u + P_l + P_r
-
-                        if P_tot > 0:
-                            P = np.random.rand()
-                            if P < P_u / P_tot and P_u > 0:  # go up
-                                dest = [i, j + 1, k]
-                                v[i, j] += 1
-                            elif P < (P_l + P_u) / P_tot:  # go left
-                                dest = [i - 1, j + diag, k]
-                                if diag == 0:
-                                    u[i, j] += 1  # LEFT
-                                    v[i, j] += 1
-                                else:
-                                    u[i, j] += np.sqrt(2)  # UP LEFT
-                                    v[i, j] += np.sqrt(2)
-                            else:  # go right
-                                if i + 1 < p.nx:
-                                    dest = [i + 1, j + diag, k]  # not a boundary
-                                else:
-                                    dest = [0, j + diag, k]  # right boundary
-                                # if np.mean(~np.isnan(s[dest, j + 1, :])) > A:  # * (np.mean(np.isnan(s[i, j, :])) < 0.5):  # this sets the angle of repose
-                                if diag == 0:
-                                    u[i, j] -= 1  # RIGHT
-                                    v[i, j] += 1
-                                else:
-                                    u[i, j] -= np.sqrt(2)  # UP RIGHT
-                                    v[i, j] += np.sqrt(2)
-
-                            # more than critical void threshold, we are a gas
-                            # if np.mean(np.isnan(s[i, j, :])) > (1 - p.min_solid_density):
-                            #     # print("aa")
-                            #     s, c, T = swap([i, j, k], [i, j + 1, k], [s, c, T])
-                            # else:
-                            #     if (
-                            #         np.mean(np.isnan(s[dest[0], j + 1, :])) < A
-                            #     ):  # only swap in if there is support?
-                            s, c, T = swap([i, j, k], dest, [s, c, T])
-                            # u[i,j] += dest[0] - i
-                            # v[i,j] += dest[1] - j
-
-    return u, v, s, c, T
-
-
-def swap(src, dest, arrays):
-    for n in range(len(arrays)):
-        if arrays[n] is not None:
-            arrays[n][*src], arrays[n][*dest] = arrays[n][*dest], arrays[n][*src]
-    return arrays
+    return u, v, s, c, T, N_swap
 
 
 def add_voids(u, v, s, c, outlet):
     if p.add_voids == "central_outlet":  # Remove at central outlet - use this one
         for i in range(p.nx // 2 - p.half_width, p.nx // 2 + p.half_width + 1):
             for k in range(p.nm):
-                # if np.random.rand() < Tg:
+                # if np.random.rand() < 0.1:
                 if not np.isnan(s[i, 0, k]):
                     if p.refill:
                         if (
@@ -555,74 +416,10 @@ def close_voids(u, v, s):
     return u, v, s
 
 
-def update_temperature(s, T, p):
-    """
-    Used for modelling the diffusion of heat into the body. Still not functional. Do not use.
-    """
-    T[np.isnan(s)] = p.temperature["inlet_temperature"]  # HACK
-    T[p.boundary] = p.temperature["boundary_temperature"]
-    T_inc = np.zeros_like(T)
-    T_inc[1:-1, 1:-1] = 1e-3 * (T[2:, 1:-1] + T[:-2, 1:-1] + T[1:-1, 2:] + T[1:-1, :-2] - 4 * T[1:-1, 1:-1])
-    return T + T_inc
-
-
-def get_average(s):
-    """
-    Calculate the mean size over the microstructural co-ordinate.
-    """
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore", category=RuntimeWarning)
-        s_bar = np.nanmean(np.nanmean(s, 2), 0)
-    return s_bar
-
-
-def get_hyperbolic_average(s):
-    """
-    Calculate the hyperbolic mean size over the microstructural co-ordinate.
-    """
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore", category=RuntimeWarning)
-        s_inv_bar = 1.0 / np.nanmean(1.0 / s, 2)
-    return s_inv_bar
-
-
-def get_depth(s):
-    """
-    Unused.
-    """
-    depth = np.mean(np.mean(~np.isnan(s), axis=2), axis=1)
-    return depth
-
-
 def time_march(p):
     """
     Run the actual simulation(s) as defined in the input json file `p`.
     """
-
-    if not os.path.exists(p.folderName):
-        os.makedirs(p.folderName)
-    if not hasattr(p, "internal_geometry"):
-        p.internal_geometry = False
-    if not hasattr(p, "cyclic_BC"):
-        p.cyclic_BC = False
-    if not hasattr(p, "theta"):
-        p.theta = 0
-    if not hasattr(p, "refill"):
-        p.refill = False
-    if not hasattr(p, "close_voids"):
-        p.close_voids = False
-    if not hasattr(p, "diag"):
-        p.diag = 0
-    # if not hasattr(p, "min_solid_density"):
-    # p.min_solid_density = 0.5
-    if not hasattr(p, "lagrangian"):
-        p.lagrangian = False
-    if not hasattr(p, "g"):
-        p.g = 9.81
-    if not hasattr(p, "critical_density"):
-        p.critical_density = 0.5
-    if not hasattr(p, "swap_case"):
-        p.swap_case = "bORc"
 
     plotter.set_plot_size(p)
 
@@ -635,22 +432,12 @@ def time_march(p):
     t = 0
 
     p.t_p = p.s_m / np.sqrt(p.g * p.H)  # smallest confinement timescale (at bottom) (s)
-    p.free_fall_velocity = np.sqrt(p.g * p.s_m)
+    p.free_fall_velocity = np.sqrt(p.g * p.dy)  # time to fall one cell (s)
 
-    p.swap_rate = 1 # np.sqrt(4 * p.mu) # FIXME
-
-    # P_scaling = (p.mu**2) / 2.0
-    # if P_scaling > 1:  # SOLVED: both swapping probabilities guaranteed to be less than or equal to 0.5
-    #     p.P_adv = 0.5
-    #     p.P_diff = p.P_adv / P_scaling
-    # else:
-    #     p.P_diff = 0.5
-    #     p.P_adv = p.P_diff * P_scaling
-
-    # p.dt = p.P_adv * p.dy / p.free_fall_velocity
-    p.dt = 1 * p.dy / p.free_fall_velocity  # HACK: WHY ONE?!?
-    # print(f"Time step is {p.dt} s")
-    # p.dt = 1.0
+    # Define reference probabilities
+    p.P_u_ref = 1.0 / (1.0 + 1.0 / p.beta) * (p.s_m / p.s_M)
+    p.P_lr_ref = p.P_u_ref / (2 * p.beta)
+    p.dt = p.P_u_ref * p.dy / p.free_fall_velocity
 
     p.nt = int(np.ceil(p.t_f / p.dt))
 
@@ -682,9 +469,6 @@ def time_march(p):
         p.boundary[np.abs(X) - 2 * p.half_width * p.dy > p.H - Y] = 1
         boundary_tile = np.tile(p.boundary.T, [p.nm, 1, 1]).T
         s[boundary_tile] = np.nan
-        # plt.pcolormesh(x,y,boundary.T)
-        # plt.show()
-        # sys.exit()
     else:
         p.boundary = np.zeros([p.nx, p.ny], dtype=bool)
 
@@ -704,21 +488,20 @@ def time_march(p):
     if hasattr(p, "temperature"):
         plotter.plot_T(x, y, s, T, p, t)
     outlet = []
+    N_swap = None
 
-    # print("Running " + p.folderName)
-    # print('Tg = ' + str(Tg) + ', k_add = ' + str(p.free_fall_velocity*dt/(Tg*H)) + '\n')
-    for t in tqdm(range(p.nt), leave=False, desc="Time"):
+    for t in tqdm(range(1, p.nt), leave=False, desc="Time"):
         outlet.append(0)
         u = np.zeros_like(u)
         v = np.zeros_like(v)
 
-        # depth = get_depth(s)
-        s_bar = get_average(s)
-        # s_inv_bar = get_hyperbolic_average(s)
+        # depth = operators.get_depth(s)
+        s_bar = operators.get_average(s)
+        # s_inv_bar = operators.get_hyperbolic_average(s)
         if hasattr(p, "temperature"):
-            T = update_temperature(s, T, p)  # delete the particles at the bottom of the hopper
+            T = thermal.update_temperature(s, T, p)  # delete the particles at the bottom of the hopper
 
-        u, v, s, c, T = move_voids(u, v, s, p, c=c, T=T)
+        u, v, s, c, T, N_swap = move_voids(u, v, s, p, c=c, T=T, N_swap=N_swap)
 
         # if t % 2 == 0:
         # u, v, s, c, T = move_voids_adv(u, v, s, c, T, boundary)
@@ -755,8 +538,7 @@ def time_march(p):
         nu_time[t] = np.mean(1 - np.mean(np.isnan(s), axis=2), axis=0)
         nu_time_x[t] = np.mean(1 - np.mean(np.isnan(s), axis=2), axis=1)
         t += 1
-        # if t % 10 == 0:
-        # print(" t = " + str(t * dt) + "                ", end="\r")
+
     plotter.plot_s(x, y, s, p, t)
     plotter.plot_nu(x, y, s, p, t)
     plotter.plot_relative_nu(x, y, s, p, t)
@@ -775,12 +557,10 @@ def time_march(p):
 
 
 if __name__ == "__main__":
-    with open(sys.argv[1], "r") as params:
-        # parse file
-        dict = json5.loads(params.read())
-        dict["input_filename"] = (sys.argv[1].split("/")[-1]).split(".")[0]
-        p_init = dict_to_class(dict)
+    with open(sys.argv[1], "r") as f:
+        dict, p_init = params.load_file(f)
 
+        # run simulations
         all_sims = list(product(*p_init.lists))
         folderNames = []
         for sim in tqdm(all_sims, desc="Sim", leave=False):
@@ -789,11 +569,13 @@ if __name__ == "__main__":
             for i, key in enumerate(p_init.list_keys):
                 dict_copy[key] = sim[i]
                 folderName += f"{key}_{sim[i]}/"
-            p = dict_to_class(dict_copy)
+            p = params.dict_to_class(dict_copy)
             p.folderName = folderName
+            p.set_defaults()
             folderNames.append(folderName)
             time_march(p)
             videoName = f"{p.folderName}/video.mp4"
-            plotter.make_video(p.folderName)
+            plotter.make_video(p.folderName, p.videos)
 
-    plotter.stack_videos(folderNames, dict["input_filename"])
+    if len(all_sims) > 1:
+        plotter.stack_videos(folderNames, dict["input_filename"], p.videos)

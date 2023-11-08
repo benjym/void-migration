@@ -1,7 +1,7 @@
 {
     // resolution
-    nx : 50, // width
-    ny : 25, // height
+    nx : 30, // width
+    ny : 15, // height
     nm : 10,  // number of simultaneous simulations
 
     // geometry
@@ -10,13 +10,12 @@
     add_voids : "None",
 
     // material properties
-    mu : [0.1,0.5,1.0,2.0], // friction angle
-    theta : 0.0,
+    friction_angle : [0,15,30,45,60,75,90], // (degrees)
     gsd_mode : 'mono',
     s_m : 0.001, // minimum particle size (m)
-    critical_density : 0.5,
-    // diag: 1,
-    // Tg : float(sys.argv[4]),
+    // s_M : 0.01, // maximum particle size (m)
+    nu_cs : 0.5,
+    beta : 1.0,
     
     // initial condition:
     fill_ratio : 0.25,
@@ -24,5 +23,5 @@
     
     // saving
     save_inc : 1,
-    t_f : 10.0,  // s
+    t_f : 5,  // s
 }

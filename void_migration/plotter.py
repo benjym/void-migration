@@ -138,7 +138,7 @@ def plot_nu(x, y, s, p, t):
 def plot_relative_nu(x, y, s, p, t):
     plt.figure(fig)
     nu = 1 - np.mean(np.isnan(s), axis=2).T
-    nu /= p.critical_density
+    nu /= p.nu_cs
     if p.internal_geometry:
         nu = np.ma.masked_where(p.boundary.T, nu)
     nu = np.ma.masked_where(nu == 0, nu)
@@ -273,84 +273,73 @@ def plot_T(x, y, s, T, p, t):
     plt.savefig(p.folderName + "T_" + str(t).zfill(6) + ".png", dpi=100)
 
 
-def make_video(path, fps=30):
+def make_video(path, videos, fps=30):
     if is_ffmpeg_installed:
-        subprocess.run(
-            ["ffmpeg", "-y", "-i", f"{path}/nu_%06d.png", "-r", f"{fps}", f"{path}/nu_video.mp4"],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-        )
-        subprocess.run(
-            ["ffmpeg", "-y", "-i", f"{path}/rel_nu_%06d.png", "-r", f"{fps}", f"{path}/rel_nu_video.mp4"],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-        )
-        subprocess.run(
-            ["ffmpeg", "-y", "-i", f"{path}/s_%06d.png", "-r", f"{fps}", f"{path}/s_video.mp4"],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-        )
+        fname = path.split("/")[-2]
+        nice_name = "=".join(fname.rsplit("_", 1))
+        subtitle = f"drawtext=text='{nice_name}':x=(w-text_w)/2:y=H-th-10:fontsize=10:fontcolor=white:box=1:boxcolor=black@0.5"
+
+        for i, video in enumerate(videos):
+            cmd = [
+                "ffmpeg",
+                "-y",
+                "-pattern_type",
+                "glob",
+                "-i",
+                f"{path}/{video}_0*.png",
+                #  "-c:v", "libx264", "-pix_fmt", "yuv420p"
+            ]
+            # add a title to the last video so we know whats going on
+            if i == len(videos) - 1:
+                cmd.extend(["-vf", subtitle])
+            cmd.extend(["-r", f"{fps}", f"{path}/{video}_video.mp4"])
+            subprocess.run(
+                cmd,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
     else:
         print("ffmpeg not installed, cannot make videos")
 
 
-def stack_videos(paths, name):
+def stack_videos(paths, name, videos):
     if is_ffmpeg_installed:
         cmd = ["ffmpeg", "-y"]
-        for f in paths:
-            cmd.extend(["-i", f"{f}/nu_video.mp4"])
-        cmd.extend(["-filter_complex", f"hstack=inputs={len(paths)}", "nu_videos.mp4"])
-        subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+        for video in videos:
+            for path in paths:
+                cmd.extend(["-i", f"{path}/{video}_video.mp4"])
+            pad_string = ""
+            for i in range(len(paths)):
+                pad_string += f"[{i}]pad=iw+5:color=black[left];[left][{i+1}]"
+
+            cmd.extend(
+                [
+                    # "-c:v", "libx264", "-pix_fmt", "yuv420p",
+                    "-filter_complex",
+                    # f"{pad_string}hstack=inputs={len(paths)}",
+                    f"hstack=inputs={len(paths)}",
+                    f"{video}_videos.mp4",
+                ]
+            )
+            subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
         cmd = ["ffmpeg", "-y"]
-        for f in paths:
-            cmd.extend(["-i", f"{f}/rel_nu_video.mp4"])
-        cmd.extend(["-filter_complex", f"hstack=inputs={len(paths)}", "rel_nu_videos.mp4"])
+        for video in videos:
+            cmd.extend(["-i", f"{video}_videos.mp4"])
+        cmd.extend(
+            [
+                # "-c:v", "libx264", "-pix_fmt", "yuv420p",
+                "-filter_complex",
+                f"vstack=inputs={len(videos)}",
+                f"output/{name}.mp4",
+            ]
+        )
         subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
-        cmd = ["ffmpeg", "-y"]
-        for f in paths:
-            cmd.extend(["-i", f"{f}/s_video.mp4"])
-        cmd.extend(["-filter_complex", f"hstack=inputs={len(paths)}", "s_videos.mp4"])
-        subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-
-        cmd = [
-            "ffmpeg",
-            "-y",
-            "-i",
-            "nu_videos.mp4",
-            "-i",
-            "rel_nu_videos.mp4",
-            "-i",
-            "s_videos.mp4",
-            "-filter_complex",
-            "vstack=inputs=3",
-            f"{name}.mp4",
-        ]
-        subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-
-        subprocess.run(["rm", "nu_videos.mp4", "rel_nu_videos.mp4", "s_videos.mp4"])
+        cmd = ["rm"]
+        for video in videos:
+            cmd.append(f"{video}_videos.mp4")
+        subprocess.run(cmd)
     else:
         print("ffmpeg not installed, cannot make videos")
-
-
-# ffmpeg -y -i output/collapse/mu_0.5/nu_%06d.png collapse_nu_05.mp4
-# ffmpeg -y -i output/collapse/mu_1.0/nu_%06d.png collapse_nu_10.mp4
-# ffmpeg -y -i output/collapse/mu_2.0/nu_%06d.png collapse_nu_20.mp4
-# ffmpeg -y -i output/collapse/mu_0.5/s_%06d.png collapse_s_05.mp4
-# ffmpeg -y -i output/collapse/mu_1.0/s_%06d.png collapse_s_10.mp4
-# ffmpeg -y -i output/collapse/mu_2.0/s_%06d.png collapse_s_20.mp4
-
-# ffmpeg -y -i collapse_nu_05.mp4 -i  collapse_nu_10.mp4 -i collapse_nu_20.mp4 -filter_complex vstack=inputs=3 collapse_nu_all.mp4
-# rm collapse_nu_05.mp4 collapse_nu_10.mp4 collapse_nu_20.mp4
-# ffmpeg -y -i collapse_s_05.mp4 -i  collapse_s_10.mp4 -i collapse_s_20.mp4 -filter_complex vstack=inputs=3 collapse_s_all.mp4
-# rm collapse_s_05.mp4 collapse_s_10.mp4 collapse_s_20.mp4
-# ffmpeg -y -i collapse_nu_all.mp4 -i collapse_s_all.mp4 -filter_complex hstack=inputs=2 collapse.mp4
-# rm collapse_nu_all.mp4 collapse_s_all.mp4
-
-# ffmpeg -y -i output/hopper/mu_0.1/half_width_3/nu_%06d.png hopper_nu_01.mp4
-# ffmpeg -y -i output/hopper/mu_1.0/half_width_3/nu_%06d.png hopper_nu_10.mp4
-# ffmpeg -y -i output/hopper/mu_10.0/half_width_3/nu_%06d.png hopper_nu_100.mp4
-# ffmpeg -y -i output/hopper/mu_0.1/half_width_3/s_%06d.png hopper_s_01.mp4
-# ffmpeg -y -i output/hopper/mu_1.0/half_width_3/s_%06d.png hopper_s_10.mp4
-# ffmpeg -y -i output/hopper/mu_10.0/half_width_3/s_%06d.png hopper_s_100.mp4
