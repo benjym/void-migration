@@ -5,6 +5,8 @@ from matplotlib.colors import LinearSegmentedColormap
 import matplotlib.cm as cm
 import warnings
 
+_video_encoding = ["-c:v", "libx265", "-preset", "fast", "-crf", "28", "-tag:v", "hvc1"]
+
 
 def is_ffmpeg_installed():
     try:
@@ -273,26 +275,30 @@ def plot_T(x, y, s, T, p, t):
     plt.savefig(p.folderName + "T_" + str(t).zfill(6) + ".png", dpi=100)
 
 
-def make_video(path, videos, fps=30):
+def make_video(p):
     if is_ffmpeg_installed:
-        fname = path.split("/")[-2]
+        fname = p.folderName.split("/")[-2]
         nice_name = "=".join(fname.rsplit("_", 1))
         subtitle = f"drawtext=text='{nice_name}':x=(w-text_w)/2:y=H-th-10:fontsize=10:fontcolor=white:box=1:boxcolor=black@0.5"
+        fps = p.save_inc / p.dt
 
-        for i, video in enumerate(videos):
+        for i, video in enumerate(p.videos):
             cmd = [
                 "ffmpeg",
                 "-y",
+                *_video_encoding,
+                "-r",
+                f"{fps}",
                 "-pattern_type",
                 "glob",
                 "-i",
-                f"{path}/{video}_0*.png",
+                f"{p.folderName}/{video}_0*.png",
                 #  "-c:v", "libx264", "-pix_fmt", "yuv420p"
             ]
             # add a title to the last video so we know whats going on
-            if i == len(videos) - 1:
+            if i == len(p.videos) - 1:
                 cmd.extend(["-vf", subtitle])
-            cmd.extend(["-r", f"{fps}", f"{path}/{video}_video.mp4"])
+            cmd.extend(["-r", "30", f"{p.folderName}/{video}_video.mp4"])
             subprocess.run(
                 cmd,
                 stdout=subprocess.DEVNULL,
@@ -304,7 +310,10 @@ def make_video(path, videos, fps=30):
 
 def stack_videos(paths, name, videos):
     if is_ffmpeg_installed:
-        cmd = ["ffmpeg", "-y"]
+        cmd = [
+            "ffmpeg",
+            "-y",
+        ]
 
         for video in videos:
             for path in paths:
@@ -315,6 +324,7 @@ def stack_videos(paths, name, videos):
 
             cmd.extend(
                 [
+                    *_video_encoding,
                     # "-c:v", "libx264", "-pix_fmt", "yuv420p",
                     "-filter_complex",
                     # f"{pad_string}hstack=inputs={len(paths)}",
@@ -329,6 +339,7 @@ def stack_videos(paths, name, videos):
             cmd.extend(["-i", f"{video}_videos.mp4"])
         cmd.extend(
             [
+                *_video_encoding,
                 # "-c:v", "libx264", "-pix_fmt", "yuv420p",
                 "-filter_complex",
                 f"vstack=inputs={len(videos)}",

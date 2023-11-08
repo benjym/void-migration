@@ -575,7 +575,7 @@ if __name__ == "__main__":
             folderNames.append(folderName)
             time_march(p)
             videoName = f"{p.folderName}/video.mp4"
-            plotter.make_video(p.folderName, p.videos)
+            plotter.make_video(p)
 
     if len(all_sims) > 1:
         plotter.stack_videos(folderNames, dict["input_filename"], p.videos)
