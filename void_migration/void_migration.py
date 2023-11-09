@@ -284,7 +284,7 @@ def move_voids(
                         # print('NOTHING')
 
                     if dest is not None:
-                        s, c, T, nu = operators.swap([i, j, k], dest, [s, c, T], nu, p)
+                        [s, c, T], nu = operators.swap([i, j, k], dest, [s, c, T], nu, p)
 
                     # N_swap[i, j] += 1
                     # N_swap[dest[0],dest[1]] += 1

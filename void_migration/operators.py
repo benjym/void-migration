@@ -8,7 +8,7 @@ def swap(src, dst, arrays, nu, p):
             arrays[n][*src], arrays[n][*dst] = arrays[n][*dst], arrays[n][*src]
     nu[src[0], src[1]] += 1.0 / p.nm
     nu[dst[0], dst[1]] -= 1.0 / p.nm
-    return [*arrays, nu]
+    return [arrays, nu]
 
 
 def get_solid_fraction(s: np.ndarray, i: int, j: int) -> float:
