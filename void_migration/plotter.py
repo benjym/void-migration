@@ -286,7 +286,6 @@ def make_video(p):
             cmd = [
                 "ffmpeg",
                 "-y",
-                *_video_encoding,
                 "-r",
                 f"{fps}",
                 "-pattern_type",
@@ -298,11 +297,11 @@ def make_video(p):
             # add a title to the last video so we know whats going on
             if i == len(p.videos) - 1:
                 cmd.extend(["-vf", subtitle])
-            cmd.extend(["-r", "30", f"{p.folderName}/{video}_video.mp4"])
+            cmd.extend(["-r", "30", *_video_encoding, f"{p.folderName}/{video}_video.mp4"])
             subprocess.run(
                 cmd,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
+                # stdout=subprocess.DEVNULL,
+                # stderr=subprocess.DEVNULL,
             )
     else:
         print("ffmpeg not installed, cannot make videos")
@@ -332,7 +331,7 @@ def stack_videos(paths, name, videos):
                     f"{video}_videos.mp4",
                 ]
             )
-            subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            subprocess.run(cmd)  # , stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
         cmd = ["ffmpeg", "-y"]
         for video in videos:
@@ -346,7 +345,7 @@ def stack_videos(paths, name, videos):
                 f"output/{name}.mp4",
             ]
         )
-        subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        subprocess.run(cmd)  # , stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
         cmd = ["rm"]
         for video in videos:
