@@ -29,6 +29,7 @@ def get_solid_fraction(s: np.ndarray, i: int, j: int) -> float:
 def get_average(s):
     """
     Calculate the mean size over the microstructural co-ordinate.
+    Then calculate along every row
     """
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", category=RuntimeWarning)
@@ -49,6 +50,14 @@ def get_hyperbolic_average(s):
 def get_depth(s):
     """
     Unused.
+
+    den = 1 - np.mean(np.isnan(s), axis=2)
+    ht = []
+    for w in range(p.nx):
+        if np.mean(den[w]) > 0:
+            ht.append(np.max(np.nonzero(den[w])))
+        else:
+            ht.append(np.argmin(den[w]))
     """
     depth = np.mean(np.mean(~np.isnan(s), axis=2), axis=1)
     return depth
