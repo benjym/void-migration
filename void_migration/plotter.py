@@ -107,7 +107,7 @@ def plot_s(x, y, s, p, t):
         warnings.simplefilter("ignore", category=RuntimeWarning)
         s_plot = np.nanmean(s, axis=2).T
     s_plot = np.ma.masked_where(np.isnan(s_plot), s_plot)
-    plt.pcolormesh(x, y, s_plot, cmap=orange_blue_cmap, vmin=p.s_m, vmax=p.s_M)
+    plt.pcolormesh(x, y, s_plot, cmap=orange_blue_cmap, vmin=0.002, vmax=0.008)
     # plt.colorbar()
     if p.internal_geometry:
         for i in p.internal_geometry["perf_pts"]:
@@ -116,7 +116,8 @@ def plot_s(x, y, s, p, t):
     plt.xlim(x[0], x[-1])
     plt.ylim(y[0], y[-1])
     plt.subplots_adjust(left=0, right=1, bottom=0, top=1)
-    plt.savefig(p.folderName + "s_" + str(t).zfill(6) + ".png", dpi=100)
+    plt.colorbar(shrink=0.8,location='top',pad = 0.01)
+    plt.savefig(p.folderName + "s_" + str(t).zfill(6) + ".png", bbox_inches='tight',dpi=100)
 
 
 def plot_nu(x, y, s, p, t):
@@ -134,7 +135,8 @@ def plot_nu(x, y, s, p, t):
     plt.xlim(x[0], x[-1])
     plt.ylim(y[0], y[-1])
     plt.subplots_adjust(left=0, right=1, bottom=0, top=1)
-    plt.savefig(p.folderName + "nu_" + str(t).zfill(6) + ".png", dpi=100)
+    plt.colorbar(shrink=0.8,location='top',pad = 0.01)
+    plt.savefig(p.folderName + "nu_" + str(t).zfill(6) + ".png", bbox_inches='tight',dpi=100)
 
 
 def plot_relative_nu(x, y, s, p, t):
@@ -154,7 +156,8 @@ def plot_relative_nu(x, y, s, p, t):
     plt.xlim(x[0], x[-1])
     plt.ylim(y[0], y[-1])
     plt.subplots_adjust(left=0, right=1, bottom=0, top=1)
-    plt.savefig(p.folderName + "rel_nu_" + str(t).zfill(6) + ".png", dpi=100)
+    plt.colorbar(shrink=0.8,location='top',pad = 0.01)
+    plt.savefig(p.folderName + "rel_nu_" + str(t).zfill(6) + ".png", bbox_inches='tight',dpi=100)
 
 
 def plot_u(x, y, s, u, v, p, t):
@@ -208,7 +211,8 @@ def plot_u(x, y, s, u, v, p, t):
     plt.xlim(x[0], x[-1])
     plt.ylim(y[0], y[-1])
     plt.subplots_adjust(left=0, right=1, bottom=0, top=1)
-    plt.savefig(p.folderName + "U_mag_" + str(t).zfill(6) + ".png", dpi=100)
+    plt.colorbar(shrink=0.8,location='top',pad = 0.01)
+    plt.savefig(p.folderName + "U_mag_" + str(t).zfill(6) + ".png", bbox_inches='tight',dpi=100)
 
 
 def plot_c(x, y, s, c, folderName, t, internal_geometry):
