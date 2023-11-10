@@ -1,8 +1,8 @@
 {
     // resolution
-    nx : 60, // width
+    nx : 50, // width
     ny : 25, // height
-    nm : 1000,  // number of simultaneous simulations
+    nm : 50,  // number of simultaneous simulations
 
     // geometry
     H : 0.1, // (m)
@@ -10,9 +10,9 @@
     add_voids : "None",
 
     // material properties
-    friction_angle : [15,30,45], // (degrees)
+    friction_angle : 35, // (degrees)
     gsd_mode : 'bi',
-    s_m : 0.001, // minimum particle size (m)
+    s_m : [0.001,0.005,0.01], // minimum particle size (m)
     s_M : 0.01, // maximum particle size (m)
     nu_cs : 0.5,
     beta : 1.0,
@@ -23,5 +23,5 @@
     
     // saving
     save_inc : 1,
-    t_f : 15,  // s
+    t_f : 5,  // s
 }
