@@ -23,6 +23,7 @@ jobs:
       # - run: touch docs/.nojekyll
       - run: pip install -e .
       - run: mkdocs gh-deploy --force
+      - run: python -m unittest
 
       - run: |
           curl -i -X POST -H 'Content-Type: application/json' -d '{
