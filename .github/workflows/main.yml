@@ -25,9 +25,20 @@ jobs:
       - run: mkdocs gh-deploy --force
       - run: python -m unittest
 
-      - run: |
+  post_success:
+    runs-on: ubuntu-latest
+    steps:
+    - name: if_push
+      if: github.event.push
+      run: |
           curl -i -X POST -H 'Content-Type: application/json' -d '{
             "text": "New push to repo. Latest commit message: ${{ github.event.head_commit.message }}"
+          }' ${{ secrets.WEBHOOK_URL }}
+    - name: if_pull_request
+      if: github.event.pull_request
+      run: |
+          curl -i -X POST -H 'Content-Type: application/json' -d '{
+            "text": "New pull request at: ${{ github.event.pull_request.html_url }}"
           }' ${{ secrets.WEBHOOK_URL }}
       
       # - run: mkdocs build
