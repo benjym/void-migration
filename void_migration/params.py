@@ -33,6 +33,8 @@ class dict_to_class:
             self.refill = False
         if not hasattr(self, "close_voids"):
             self.close_voids = False
+        if not hasattr(self, "charge_discharge"):
+            self.charge_discharge = False
         if not hasattr(self, "diag"):
             self.diag = 0
         if not hasattr(self, "lagrangian"):

@@ -381,7 +381,11 @@ def add_voids(u, v, s, c, outlet):
     #     if t == 0:
     #         s[nx // 2, 0, :] = np.nan
     elif p.add_voids == "pour":  # pour in centre at top
-        s[p.nx // 2 - p.half_width : p.nx // 2 + p.half_width + 1, -1, :] = 1.0
+        if p.gsd_mode == "bi":  # bidisperse
+            req = np.random.choice([p.s_m, p.s_M], size=[p.nx // 2 + p.half_width + 1 - p.nx // 2 - p.half_width, p.nm])
+            mask = np.random.rand(p.nx // 2 + p.half_width + 1 - p.nx // 2 - p.half_width, p.nm) > p.fill_ratio
+            req[mask] = np.nan
+        s[p.nx // 2 - p.half_width : p.nx // 2 + p.half_width + 1, -1, :] = req
     return u, v, s, c, outlet
 
 
@@ -414,6 +418,24 @@ def close_voids(u, v, s):
                     #     v[i, j:] -= 1
                     #     s[i, j:, k] = np.roll(s[i, j:, k], -1)
     return u, v, s
+
+def charge_discharge(p,t):
+    '''
+    As of now three times have to be given
+    t_fill - filling time
+    t_settle - allow the cells to settle
+    t_f - end time
+    '''
+    if t <= int(p.t_fill/p.dt):
+        p.add_voids = 'pour'
+    elif int(p.t_fill/p.dt) < t <= int(p.t_settle/p.dt):
+        p.add_voids = 'None'
+    else:
+        p.half_width = 3
+        p.add_voids = "central_outlet"
+        p.save_outlet = True
+
+    return p 
 
 
 def time_march(p):
@@ -514,6 +536,10 @@ def time_march(p):
 
         if p.close_voids:
             u, v, s = close_voids(u, v, s)
+
+        if p.charge_discharge:
+            p = charge_discharge(p,t)
+            
 
         if t % p.save_inc == 0:
             plotter.plot_s(x, y, s, p, t)
