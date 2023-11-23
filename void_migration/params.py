@@ -43,6 +43,8 @@ class dict_to_class:
             self.g = 9.81
         if not hasattr(self, "nu_cs"):
             self.nu_cs = 0.5
+        if not hasattr(self, "nu_g"):
+            self.nu_g = 0.1
         if not hasattr(self, "beta"):
             self.beta = 1.0
         if not hasattr(self, "videos"):

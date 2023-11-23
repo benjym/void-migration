@@ -107,7 +107,7 @@ def plot_s(x, y, s, p, t):
         warnings.simplefilter("ignore", category=RuntimeWarning)
         s_plot = np.nanmean(s, axis=2).T
     s_plot = np.ma.masked_where(np.isnan(s_plot), s_plot)
-    plt.pcolormesh(x, y, s_plot, cmap=orange_blue_cmap, vmin=0.002, vmax=0.008)
+    plt.pcolormesh(x, y, s_plot, cmap=orange_blue_cmap, vmin=0.001, vmax=0.01)
     # plt.colorbar()
     if p.internal_geometry:
         for i in p.internal_geometry["perf_pts"]:

@@ -199,54 +199,107 @@ def move_voids(
                 # if np.random.rand() < p.free_fall_velocity*p.dt/p.dy:
 
                 # UP
-                if np.isnan(s[i, j + 1, k]):
-                    P_u = 0
-                else:
-                    P_u = p.P_u_ref * (s_inv_bar[i, j] / s[i, j + 1, k])
+                #print(nu[i,j] < p.nu_g, s[i,j+1,k])
 
-                # LEFT
-                if i == 0:
-                    if p.cyclic_BC:
-                        l = -1
+                if nu[i, j] < p.nu_g and p.charge_discharge:
+                    if np.isnan(s[i, j + 1, k]): 
+                        P_u = 0
                     else:
-                        l = i  # will force P_l to be zero at boundary
-                else:
-                    l = i - 1
+                        P_u = p.P_u_ref 
 
-                # if np.isnan(s[l, j + diag, k]):
-                if np.isnan(s[l, j + diag, k]) or stable_slope(s, i, j, l, p, nu, dnu_dx, dnu_dy):
-                    P_l = 0  # P_r + P_l = 1 at s=1
-                else:
-                    # P_l = (0.5 + 0.5 * np.sin(np.radians(p.theta))) / (s[l, j + diag, k]/s_inv_bar[i,j])
-                    P_l = p.P_lr_ref * (s_inv_bar[i, j] / s[l, j + diag, k])
-
-                # if hasattr(p, "internal_geometry"):
-                #     if p.boundary[l, j + diag]:
-                #         P_l *= p.internal_geometry["perf_rate"]
-                # if perf_plate and i-1==perf_pts[0]: P_l *= perf_rate
-                # if perf_plate and i-1==perf_pts[1]: P_l *= perf_rate
-
-                # RIGHT
-                if i == p.nx - 1:
-                    if p.cyclic_BC:
-                        r = 0
+                    # LEFT
+                    if i == 0:
+                        if p.cyclic_BC:
+                            l = -1
+                        else:
+                            l = i  # will force P_l to be zero at boundary
                     else:
-                        r = i  # will force P_r to be zero at boundary
-                else:
-                    r = i + 1
+                        l = i - 1
 
-                # if np.isnan(s[r, j + diag, k]):
-                if np.isnan(s[r, j + diag, k]) or stable_slope(s, i, j, r, p, nu, dnu_dx, dnu_dy):
-                    P_r = 0
-                else:
-                    # P_r = (0.5 - 0.5 * np.sin(np.radians(p.theta))) / (s[r, j + diag, k]/s_inv_bar[i,j])
-                    P_r = p.P_lr_ref * (s_inv_bar[i, j] / s[r, j + diag, k])
+                    # if np.isnan(s[l, j + diag, k]):
+                    if np.isnan(s[l, j + diag, k]) or stable_slope(s, i, j, l, p, nu, dnu_dx, dnu_dy):
+                        P_l = 0  # P_r + P_l = 1 at s=1
+                    else:
+                        # P_l = (0.5 + 0.5 * np.sin(np.radians(p.theta))) / (s[l, j + diag, k]/s_inv_bar[i,j])
+                        P_l = p.P_lr_ref 
 
-                # if p.internal_geometry:
-                #     if p.boundary[r, j + diag]:
-                #         P_r *= p.internal_geometry["perf_rate"]
-                # if perf_plate and i+1==perf_pts[0]: P_r *= perf_rate
-                # if perf_plate and i+1==perf_pts[1]: P_r *= perf_rate
+                    # if hasattr(p, "internal_geometry"):
+                    #     if p.boundary[l, j + diag]:
+                    #         P_l *= p.internal_geometry["perf_rate"]
+                    # if perf_plate and i-1==perf_pts[0]: P_l *= perf_rate
+                    # if perf_plate and i-1==perf_pts[1]: P_l *= perf_rate
+
+                    # RIGHT
+                    if i == p.nx - 1:
+                        if p.cyclic_BC:
+                            r = 0
+                        else:
+                            r = i  # will force P_r to be zero at boundary
+                    else:
+                        r = i + 1
+
+                    # if np.isnan(s[r, j + diag, k]):
+                    if np.isnan(s[r, j + diag, k]) or stable_slope(s, i, j, r, p, nu, dnu_dx, dnu_dy):
+                        P_r = 0
+                    else:
+                        # P_r = (0.5 - 0.5 * np.sin(np.radians(p.theta))) / (s[r, j + diag, k]/s_inv_bar[i,j])
+                        P_r = p.P_lr_ref 
+
+                    # if p.internal_geometry:
+                    #     if p.boundary[r, j + diag]:
+                    #         P_r *= p.internal_geometry["perf_rate"]
+                    # if perf_plate and i+1==perf_pts[0]: P_r *= perf_rate
+                    # if perf_plate and i+1==perf_pts[1]: P_r *= perf_rate
+
+                else:
+                    if np.isnan(s[i, j + 1, k]): 
+                        P_u = 0
+                    else:
+                        P_u = p.P_u_ref * (s_inv_bar[i, j] / s[i, j + 1, k])
+
+                    # LEFT
+                    if i == 0:
+                        if p.cyclic_BC:
+                            l = -1
+                        else:
+                            l = i  # will force P_l to be zero at boundary
+                    else:
+                        l = i - 1
+
+                    # if np.isnan(s[l, j + diag, k]):
+                    if np.isnan(s[l, j + diag, k]) or stable_slope(s, i, j, l, p, nu, dnu_dx, dnu_dy):
+                        P_l = 0  # P_r + P_l = 1 at s=1
+                    else:
+                        # P_l = (0.5 + 0.5 * np.sin(np.radians(p.theta))) / (s[l, j + diag, k]/s_inv_bar[i,j])
+                        P_l = p.P_lr_ref * (s_inv_bar[i, j] / s[l, j + diag, k])
+
+                    # if hasattr(p, "internal_geometry"):
+                    #     if p.boundary[l, j + diag]:
+                    #         P_l *= p.internal_geometry["perf_rate"]
+                    # if perf_plate and i-1==perf_pts[0]: P_l *= perf_rate
+                    # if perf_plate and i-1==perf_pts[1]: P_l *= perf_rate
+
+                    # RIGHT
+                    if i == p.nx - 1:
+                        if p.cyclic_BC:
+                            r = 0
+                        else:
+                            r = i  # will force P_r to be zero at boundary
+                    else:
+                        r = i + 1
+
+                    # if np.isnan(s[r, j + diag, k]):
+                    if np.isnan(s[r, j + diag, k]) or stable_slope(s, i, j, r, p, nu, dnu_dx, dnu_dy):
+                        P_r = 0
+                    else:
+                        # P_r = (0.5 - 0.5 * np.sin(np.radians(p.theta))) / (s[r, j + diag, k]/s_inv_bar[i,j])
+                        P_r = p.P_lr_ref * (s_inv_bar[i, j] / s[r, j + diag, k])
+
+                    # if p.internal_geometry:
+                    #     if p.boundary[r, j + diag]:
+                    #         P_r *= p.internal_geometry["perf_rate"]
+                    # if perf_plate and i+1==perf_pts[0]: P_r *= perf_rate
+                    # if perf_plate and i+1==perf_pts[1]: P_r *= perf_rate
 
                 P_tot = P_u + P_l + P_r
                 # print(P_tot)
