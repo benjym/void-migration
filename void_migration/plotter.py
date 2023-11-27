@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 from matplotlib.colors import LinearSegmentedColormap
 import matplotlib.cm as cm
 import warnings
+from operators import get_average
 
 _video_encoding = ["-c:v", "libx265", "-preset", "fast", "-crf", "28", "-tag:v", "hvc1"]
 
@@ -98,6 +99,34 @@ def plot_s_bar(y, s_bar, nu_time, p):
     plt.ylabel("Height (m)")
     plt.colorbar()
     plt.savefig(p.folderName + "nu.png")
+
+
+def save_coordinate_system(x, y, p):
+    np.savetxt(p.folderName + "x.csv", x, delimiter=",")
+    np.savetxt(p.folderName + "y.csv", y, delimiter=",")
+
+
+def plot_permeability(x, y, s, p, t):
+    """
+    Calculate and save the permeability of the domain at time t.
+    """
+    sphericity = 1
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", category=RuntimeWarning)
+        porosity = np.mean(np.isnan(s), axis=2)
+        s_bar = get_average(s)
+        permeability = sphericity**2 * (porosity**3) * s_bar**2 / (180 * (1 - porosity) ** 2)
+
+    plt.figure(fig)
+    plt.clf()
+    plt.pcolormesh(x, y, permeability.T, cmap="inferno")
+    plt.axis("off")
+    plt.xlim(x[0], x[-1])
+    plt.ylim(y[0], y[-1])
+    plt.subplots_adjust(left=0, right=1, bottom=0, top=1)
+    plt.savefig(p.folderName + "permeability_" + str(t).zfill(6) + ".png", dpi=100)
+
+    np.savetxt(p.folderName + "permeability_" + str(t).zfill(6) + ".csv", permeability, delimiter=",")
 
 
 def plot_s(x, y, s, p, t):

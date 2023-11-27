@@ -57,6 +57,9 @@ def IC(p):
         mask[
             p.nx // 2 - int(p.fill_ratio / 2 * p.nx) : p.nx // 2 + int(p.fill_ratio / 2 * p.nx), :, :
         ] = False
+        mask[
+            :, -1, :
+        ] = True  # top row can't be filled for algorithmic reasons - could solve this if we need to
     elif p.IC_mode == "empty":  # completely empty
         mask = np.ones([p.nx, p.ny, p.nm], dtype=bool)
 
@@ -218,7 +221,8 @@ def move_voids(
                     P_l = 0  # P_r + P_l = 1 at s=1
                 else:
                     # P_l = (0.5 + 0.5 * np.sin(np.radians(p.theta))) / (s[l, j + diag, k]/s_inv_bar[i,j])
-                    P_l = p.P_lr_ref * (s_inv_bar[i, j] / s[l, j + diag, k])
+                    # P_l = p.P_lr_ref * (s_inv_bar[i, j] / s[l, j + diag, k])
+                    P_l = p.P_lr_ref * s[l, j + diag, k]
 
                 # if hasattr(p, "internal_geometry"):
                 #     if p.boundary[l, j + diag]:
@@ -240,7 +244,8 @@ def move_voids(
                     P_r = 0
                 else:
                     # P_r = (0.5 - 0.5 * np.sin(np.radians(p.theta))) / (s[r, j + diag, k]/s_inv_bar[i,j])
-                    P_r = p.P_lr_ref * (s_inv_bar[i, j] / s[r, j + diag, k])
+                    # P_r = p.P_lr_ref * (s_inv_bar[i, j] / s[r, j + diag, k])
+                    P_r = p.P_lr_ref * s[r, j + diag, k]
 
                 # if p.internal_geometry:
                 #     if p.boundary[r, j + diag]:
@@ -435,9 +440,25 @@ def time_march(p):
     p.free_fall_velocity = np.sqrt(p.g * p.dy)  # time to fall one cell (s)
 
     # Define reference probabilities
-    p.P_u_ref = 1.0 / (1.0 + 1.0 / p.beta) * (p.s_m / p.s_M)
-    p.P_lr_ref = p.P_u_ref / (2 * p.beta)
-    p.dt = p.P_u_ref * p.dy / p.free_fall_velocity
+    # p.P_u_ref = 1.0 / (1.0 + 1.0 / p.beta) * (p.s_m / p.s_M)
+    # p.P_lr_ref = p.P_u_ref / (2 * p.beta)
+    # p.dt = p.P_u_ref * p.dy / p.free_fall_velocity
+
+    safe = False
+    stability = 0.5
+    while not safe:
+        p.P_u_ref = stability
+        p.dt = p.P_u_ref * p.dy / p.free_fall_velocity
+        # p.P_lr_ref = p.beta * p.dt / p.dy / p.dy # NOTE: p.beta HAS UNITS OF VELOCITY!!
+        p.P_lr_ref = p.beta * p.free_fall_velocity * p.dt / p.dy / p.dy  # NOTE: BETA IS DIMENSIONLESS
+
+        p.P_u_max = p.P_u_ref * (p.s_M / p.s_m)
+        p.P_lr_max = p.P_lr_ref * p.s_M
+
+        if p.P_u_max + 2 * p.P_lr_max <= 1:
+            safe = True
+        else:
+            stability *= 0.9
 
     p.nt = int(np.ceil(p.t_f / p.dt))
 
@@ -479,6 +500,7 @@ def time_march(p):
     else:
         T = None
 
+    plotter.save_coordinate_system(x, y, p)
     plotter.plot_s(x, y, s, p, t)
     plotter.plot_nu(x, y, s, p, t)
     plotter.plot_relative_nu(x, y, s, p, t)
@@ -532,6 +554,8 @@ def time_march(p):
                 np.savetxt(p.folderName + "u.csv", u / np.sum(np.isnan(s), axis=2), delimiter=",")
             if hasattr(p, "save_density_profile"):
                 plotter.plot_profile(x, nu_time_x, p)
+            if hasattr(p, "save_permeability"):
+                plotter.plot_permeability(x, y, s, p, t)
 
         s_bar_time[t] = s_bar  # save average size
         u_time[t] = np.mean(u, axis=0)

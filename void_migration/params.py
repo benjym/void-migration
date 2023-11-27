@@ -23,6 +23,9 @@ class dict_to_class:
     def set_defaults(self):
         if not os.path.exists(self.folderName):
             os.makedirs(self.folderName)
+        if not hasattr(self, "ny"):
+            if hasattr(self, "aspect_ratio"):
+                self.ny = int(self.nx * self.aspect_ratio)
         if not hasattr(self, "internal_geometry"):
             self.internal_geometry = False
         if not hasattr(self, "cyclic_BC"):
@@ -43,6 +46,8 @@ class dict_to_class:
             self.nu_cs = 0.5
         if not hasattr(self, "beta"):
             self.beta = 1.0
+        if not hasattr(self, "save_permeability"):
+            self.save_permeability = False
         if not hasattr(self, "videos"):
             self.videos = ["nu", "rel_nu", "s", "U_mag"]  # options are nu, rel_nu, s, u, v and U_mag
 
