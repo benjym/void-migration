@@ -13,6 +13,7 @@ import numpy as np
 from tqdm import tqdm
 from itertools import product
 from numpy.typing import ArrayLike
+from scipy.ndimage import maximum_filter
 
 # from numba import jit, njit
 import plotter
@@ -31,39 +32,69 @@ def IC(p):
     Returns:
         The array of grain sizes. Values of `NaN` are voids.
     """
+    rng = np.random.default_rng()
+    pre_masked = False
 
     # pick a grain size distribution
     if p.gsd_mode == "mono":
         s = p.s_m * np.ones([p.nx, p.ny, p.nm])  # monodisperse
         p.s_M = p.s_m
     if p.gsd_mode == "bi":  # bidisperse
-        s = np.random.choice([p.s_m, p.s_M], size=[p.nx, p.ny, p.nm])
+        if (p.nm * p.large_concentration * p.nu_fill) < 2:
+            s = np.random.choice([p.s_m, p.s_M], size=[p.nx, p.ny, p.nm])
+        else:
+            s = np.nan * np.ones([p.nx, p.ny, p.nm])
+            for i in range(p.nx):
+                for j in range(p.ny):
+                    large = rng.choice(
+                        p.nm, size=int(p.nm * p.large_concentration * p.nu_fill), replace=False
+                    )
+                    s[i, j, large] = p.s_M
+                    remaining = np.where(np.isnan(s[i, j, :]))[0]
+                    small = rng.choice(
+                        remaining, size=int(p.nm * (1 - p.large_concentration) * p.nu_fill), replace=False
+                    )
+                    s[i, j, small] = p.s_m
+                    pre_masked = True
     elif p.gsd_mode == "poly":  # polydisperse
         # s_0 = p.s_m / (1.0 - p.s_m)  # intermediate calculation
-        s_non_dim = np.random.rand(p.nx, p.ny, p.nm)
+        s_non_dim = np.random.rand(p.nm)
         # s = (s + s_0) / (s_0 + 1.0)  # now between s_m and 1
-        s = (p.s_M - p.s_m) * s_non_dim + p.s_m
+        this_s = (p.s_M - p.s_m) * s_non_dim + p.s_m
+        s = np.nan * np.ones([p.nx, p.ny, p.nm])
+        # HACK: gsd least uniform in space, still need to account for voids
+        for i in range(p.nx):
+            for j in range(p.ny):
+                np.shuffle(this_s)
+                s[i, j, :] = this_s
 
     # where particles are in space
-    if p.IC_mode == "random":  # voids everywhere randomly
-        mask = np.random.rand(p.nx, p.ny, p.nm) > p.fill_ratio
-    elif p.IC_mode == "top":  # voids at the top
-        mask = np.zeros([p.nx, p.ny, p.nm], dtype=bool)
-        mask[:, int(p.fill_ratio * p.ny) :, :] = True
-    elif p.IC_mode == "full":  # completely full
-        mask = np.zeros_like(s, dtype=bool)
-    elif p.IC_mode == "column":  # just middle full to top
-        mask = np.ones([p.nx, p.ny, p.nm], dtype=bool)
-        mask[
-            p.nx // 2 - int(p.fill_ratio / 2 * p.nx) : p.nx // 2 + int(p.fill_ratio / 2 * p.nx), :, :
-        ] = False
-        mask[
-            :, -1, :
-        ] = True  # top row can't be filled for algorithmic reasons - could solve this if we need to
-    elif p.IC_mode == "empty":  # completely empty
-        mask = np.ones([p.nx, p.ny, p.nm], dtype=bool)
+    if not pre_masked:
+        if p.IC_mode == "random":  # voids everywhere randomly
+            mask = np.random.rand(p.nx, p.ny, p.nm) < p.nu_fill
+        elif p.IC_mode == "top":  # voids at the top
+            mask = np.zeros([p.nx, p.ny, p.nm], dtype=bool)
+            mask[:, int(p.fill_ratio * p.ny) :, :] = True
+        elif p.IC_mode == "full":  # completely full
+            mask = np.zeros_like(s, dtype=bool)
+        elif p.IC_mode == "column":  # just middle full to top
+            mask = np.ones([p.nx, p.ny, p.nm], dtype=bool)
+            mask[
+                p.nx // 2 - int(p.fill_ratio / 2 * p.nx) : p.nx // 2 + int(p.fill_ratio / 2 * p.nx), :, :
+            ] = False
 
-    s[mask] = np.nan
+            # for i in range(p.nx):
+            #     for j in range(p.ny):
+            #         this_mask = rng.choice(p.nm, size=int(p.nm*(1-p.fill_density)), replace=False)
+            #         mask[i, j, this_mask] = True
+
+            mask[
+                :, -1, :
+            ] = True  # top row can't be filled for algorithmic reasons - could solve this if we need to
+        elif p.IC_mode == "empty":  # completely empty
+            mask = np.ones([p.nx, p.ny, p.nm], dtype=bool)
+
+        s[mask] = np.nan
 
     return s
 
@@ -181,18 +212,32 @@ def move_voids(
     #         np.random.shuffle(m_loop)
     #         for k in m_loop:
     nu = 1.0 - np.mean(np.isnan(s[:, :, :]), axis=2)
-    dnu_dx, dnu_dy = np.gradient(nu)
+    # kernel = np.array([[0,1,0],[1,0,1],[0,0,0]]).T
 
+    # nu_max = maximum_filter(nu, footprint=kernel)#, mode='constant', cval=0.0)
+    # import matplotlib.pyplot as plt
+    # plt.figure(7)
+    # plt.subplot(211)
+    # plt.imshow(nu.T)
+    # plt.colorbar()
+    # plt.subplot(212)
+    # plt.imshow(nu_max.T)
+    # plt.colorbar()
+    # plt.pause(0.001)
+
+    dnu_dx, dnu_dy = np.gradient(nu)
+    s_bar = operators.get_average(s)
     s_inv_bar = operators.get_hyperbolic_average(
         s
     )  # HACK: SHOULD RECALCULATE AFTER EVERY SWAP — WILL BE SUPER SLOW??
-    s_inv_bar[np.isnan(s_inv_bar)] = 1.0 / (1.0 / p.s_m + 1.0 / p.s_M)  # FIXME
+    # s_inv_bar[np.isnan(s_inv_bar)] = 1.0 / (1.0 / p.s_m + 1.0 / p.s_M)  # FIXME
+    # s_bar[np.isnan(s_bar)] = (p.s_m + p.s_M)/2.  # FIXME
 
-    indices = np.arange(p.nx * (p.ny - 1) * p.nm)
-    np.random.shuffle(indices)
-    for index in indices:
+    for index in params.indices:
         i, j, k = np.unravel_index(index, [p.nx, p.ny - 1, p.nm])
-        if nu[i, j] < p.nu_cs:  # the material is a liquid (below critical solid fraction)
+        if (
+            nu[i, j] < p.nu_cs
+        ):  # and nu_max[i,j] > 0:  # the material is a liquid (below critical solid fraction) AND there is some material nearby
             # if ((nu[i, j] < p.nu_cs) and (np.abs(dnu_dx[i,j]) > p.mu*p.nu_cs/2.)):  # the material is a liquid (below critical solid fraction AND slope is high)
             if np.isnan(s[i, j, k]):
                 # print(s_inv_bar[i,j])
@@ -205,7 +250,7 @@ def move_voids(
                 if np.isnan(s[i, j + 1, k]):
                     P_u = 0
                 else:
-                    P_u = p.P_u_ref * (s_inv_bar[i, j] / s[i, j + 1, k])
+                    P_u = p.P_u_ref * (s_inv_bar[i, j + 1] / s[i, j + 1, k])
 
                 # LEFT
                 if i == 0:
@@ -222,7 +267,7 @@ def move_voids(
                 else:
                     # P_l = (0.5 + 0.5 * np.sin(np.radians(p.theta))) / (s[l, j + diag, k]/s_inv_bar[i,j])
                     # P_l = p.P_lr_ref * (s_inv_bar[i, j] / s[l, j + diag, k])
-                    P_l = p.P_lr_ref * s[l, j + diag, k]
+                    P_l = p.P_lr_ref * (s[l, j + diag, k] / s_bar[l, j + diag])
 
                 # if hasattr(p, "internal_geometry"):
                 #     if p.boundary[l, j + diag]:
@@ -245,7 +290,7 @@ def move_voids(
                 else:
                     # P_r = (0.5 - 0.5 * np.sin(np.radians(p.theta))) / (s[r, j + diag, k]/s_inv_bar[i,j])
                     # P_r = p.P_lr_ref * (s_inv_bar[i, j] / s[r, j + diag, k])
-                    P_r = p.P_lr_ref * s[r, j + diag, k]
+                    P_r = p.P_lr_ref * (s[r, j + diag, k] / s_bar[r, j + diag])
 
                 # if p.internal_geometry:
                 #     if p.boundary[r, j + diag]:
@@ -450,22 +495,24 @@ def time_march(p):
         p.P_u_ref = stability
         p.dt = p.P_u_ref * p.dy / p.free_fall_velocity
         # p.P_lr_ref = p.beta * p.dt / p.dy / p.dy # NOTE: p.beta HAS UNITS OF VELOCITY!!
-        p.P_lr_ref = p.beta * p.free_fall_velocity * p.dt / p.dy / p.dy  # NOTE: BETA IS DIMENSIONLESS
+        p.P_lr_ref = p.P_u_ref / (
+            2 * p.beta
+        )  # * p.free_fall_velocity * p.dt / p.dy / p.dy  # NOTE: BETA IS DIMENSIONLESS
 
         p.P_u_max = p.P_u_ref * (p.s_M / p.s_m)
-        p.P_lr_max = p.P_lr_ref * p.s_M
+        p.P_lr_max = p.P_lr_ref * (p.s_M / p.s_m)
 
         if p.P_u_max + 2 * p.P_lr_max <= 1:
             safe = True
         else:
-            stability *= 0.9
+            stability *= 0.95
 
     p.nt = int(np.ceil(p.t_f / p.dt))
 
-    s_bar_time = np.zeros([p.nt, p.ny])
-    nu_time = np.zeros_like(s_bar_time)
-    nu_time_x = np.zeros([p.nt, p.nx])
-    u_time = np.zeros_like(s_bar_time)
+    # s_bar_time = np.zeros([p.nt, p.ny])
+    # nu_time = np.zeros_like(s_bar_time)
+    # nu_time_x = np.zeros([p.nt, p.nx])
+    # u_time = np.zeros_like(s_bar_time)
 
     s = IC(p)  # non-dimensional size
     u = np.zeros([p.nx, p.ny])
@@ -501,16 +548,12 @@ def time_march(p):
         T = None
 
     plotter.save_coordinate_system(x, y, p)
-    plotter.plot_s(x, y, s, p, t)
-    plotter.plot_nu(x, y, s, p, t)
-    plotter.plot_relative_nu(x, y, s, p, t)
-    plotter.plot_u(x, y, s, u, v, p, t)
-    if hasattr(p, "concentration"):
-        plotter.plot_c(x, y, s, c, p, t)
-    if hasattr(p, "temperature"):
-        plotter.plot_T(x, y, s, T, p, t)
+    plotter.make_saves(x, y, s, u, v, c, T, p, t)
     outlet = []
     N_swap = None
+
+    params.indices = np.arange(p.nx * (p.ny - 1) * p.nm)
+    np.random.shuffle(params.indices)
 
     for t in tqdm(range(1, p.nt), leave=False, desc="Time"):
         outlet.append(0)
@@ -518,7 +561,7 @@ def time_march(p):
         v = np.zeros_like(v)
 
         # depth = operators.get_depth(s)
-        s_bar = operators.get_average(s)
+        # s_bar = operators.get_average(s)
         # s_inv_bar = operators.get_hyperbolic_average(s)
         if hasattr(p, "temperature"):
             T = thermal.update_temperature(s, T, p)  # delete the particles at the bottom of the hopper
@@ -538,46 +581,15 @@ def time_march(p):
             u, v, s = close_voids(u, v, s)
 
         if t % p.save_inc == 0:
-            plotter.plot_s(x, y, s, p, t)
-            plotter.plot_nu(x, y, s, p, t)
-            plotter.plot_relative_nu(x, y, s, p, t)
-            plotter.plot_u(x, y, s, u, v, p, t)
+            plotter.make_saves(x, y, s, u, v, c, T, p, t)
 
-            if hasattr(p, "concentration"):
-                plotter.plot_c(x, y, s, c, p.folderName, t, p.internal_geometry)
-            if hasattr(p, "save_outlet"):
-                np.savetxt(p.folderName + "outlet.csv", np.array(outlet), delimiter=",")
-            if hasattr(p, "temperature"):
-                plotter.plot_T(x, y, s, T, p, t)
-                np.savetxt(p.folderName + "outlet_T.csv", np.array(outlet_T), delimiter=",")
-            if hasattr(p, "save_velocity"):
-                np.savetxt(p.folderName + "u.csv", u / np.sum(np.isnan(s), axis=2), delimiter=",")
-            if hasattr(p, "save_density_profile"):
-                plotter.plot_profile(x, nu_time_x, p)
-            if hasattr(p, "save_permeability"):
-                plotter.plot_permeability(x, y, s, p, t)
-
-        s_bar_time[t] = s_bar  # save average size
-        u_time[t] = np.mean(u, axis=0)
-        nu_time[t] = np.mean(1 - np.mean(np.isnan(s), axis=2), axis=0)
-        nu_time_x[t] = np.mean(1 - np.mean(np.isnan(s), axis=2), axis=1)
+        # s_bar_time[t] = s_bar  # save average size
+        # u_time[t] = np.mean(u, axis=0)
+        # nu_time[t] = np.mean(1 - np.mean(np.isnan(s), axis=2), axis=0)
+        # nu_time_x[t] = np.mean(1 - np.mean(np.isnan(s), axis=2), axis=1)
         t += 1
 
-    plotter.plot_s(x, y, s, p, t)
-    plotter.plot_nu(x, y, s, p, t)
-    plotter.plot_relative_nu(x, y, s, p, t)
-    plotter.plot_u(x, y, s, u, v, p, t)
-    plotter.plot_s_bar(y, s_bar_time, nu_time, p)
-    plotter.plot_u_time(y, u_time, nu_time, p)
-    np.save(p.folderName + "nu_t_x.npy", nu_time_x)
-    if hasattr(p, "concentration"):
-        plotter.plot_c(c)
-    if hasattr(p, "save_outlet"):
-        np.savetxt(p.folderName + "outlet.csv", np.array(outlet), delimiter=",")
-    if hasattr(p, "save_velocity"):
-        np.savetxt(p.folderName + "u.csv", u / np.sum(np.isnan(s), axis=2), delimiter=",")
-    if hasattr(p, "save_density_profile"):
-        plotter.plot_profile(x, nu_time_x, p)
+    plotter.make_saves(x, y, s, u, v, c, T, p, t)
 
 
 if __name__ == "__main__":

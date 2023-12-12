@@ -2,7 +2,7 @@
     // resolution
     nx : 20, // width
     ny : 50, // height
-    nm : 1,  // number of simultaneous simulations
+    nm : 10,  // number of simultaneous simulations
 
     // geometry
     H : 0.1, // m
@@ -22,7 +22,7 @@
 
     // initial conditions
     IC_mode : "random",  // just leave empty space at the top
-    fill_ratio : 0.4,  // how high to fill the container initially
+    nu_fill : 0.4,  // how high to fill the container initially
     // IC_mode : 'random',
     // fill : 0.3
 
