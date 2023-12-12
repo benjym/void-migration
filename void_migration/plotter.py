@@ -4,8 +4,23 @@ import matplotlib.pyplot as plt
 from matplotlib.colors import LinearSegmentedColormap
 import matplotlib.cm as cm
 import warnings
+from operators import get_average
 
-_video_encoding = ["-c:v", "libx265", "-preset", "fast", "-crf", "28", "-tag:v", "hvc1"]
+# _video_encoding = ["-c:v", "libx265", "-preset", "fast", "-crf", "28", "-tag:v", "hvc1"] # nice small file sizes
+_video_encoding = [
+    "-c:v",
+    "libx264",
+    "-preset",
+    "slow",
+    "-profile:v",
+    "high",
+    "-level:v",
+    "4.0",
+    "-pix_fmt",
+    "yuv420p",
+    "-crf",
+    "22",
+]  # powerpoint compatible
 
 
 def is_ffmpeg_installed():
@@ -57,6 +72,30 @@ def set_plot_size(p):
     summary_fig = plt.figure()
 
 
+def make_saves(x, y, s, u, v, c, T, p, t):
+    if "s" in p.save:
+        plot_s(x, y, s, p, t)
+    if "nu" in p.save:
+        plot_nu(x, y, s, p, t)
+    if "rel_nu" in p.save:
+        plot_relative_nu(x, y, s, p, t)
+    if "U_mag" in p.save:
+        plot_u(x, y, s, u, v, p, t)
+    if "concentration" in p.save:
+        plot_c(x, y, s, c, p.folderName, t, p.internal_geometry)
+    if "outlet" in p.save:
+        np.savetxt(p.folderName + "outlet.csv", np.array(outlet), delimiter=",")
+    if "temperature" in p.save:
+        plot_T(x, y, s, T, p, t)
+        np.savetxt(p.folderName + "outlet_T.csv", np.array(outlet_T), delimiter=",")
+    if "velocity" in p.save:
+        np.savetxt(p.folderName + "u.csv", u / np.sum(np.isnan(s), axis=2), delimiter=",")
+    if "density_profile" in p.save:
+        plot_profile(x, nu_time_x, p)
+    if "permeability" in p.save:
+        plot_permeability(x, y, s, p, t)
+
+
 def plot_u_time(y, U, nu_time, p):
     plt.figure(summary_fig)
 
@@ -84,8 +123,15 @@ def plot_u_time(y, U, nu_time, p):
 def plot_s_bar(y, s_bar, nu_time, p):
     plt.figure(summary_fig)
 
+    if p.mask_s_bar:
+        masked_s_bar = np.ma.masked_where(nu_time < p.nu_cs / 10.0, s_bar)
+    else:
+        masked_s_bar = s_bar
+
     plt.clf()
-    plt.pcolormesh(np.linspace(0, p.t_f, p.nt), y, s_bar.T, cmap=orange_blue_cmap, vmin=p.s_m, vmax=p.s_M)
+    plt.pcolormesh(
+        np.linspace(0, p.t_f, p.nt), y, masked_s_bar.T, cmap=orange_blue_cmap, vmin=p.s_m, vmax=p.s_M
+    )
     plt.colorbar()
     plt.xlabel("Time (s)")
     plt.ylabel("Height (m)")
@@ -98,6 +144,34 @@ def plot_s_bar(y, s_bar, nu_time, p):
     plt.ylabel("Height (m)")
     plt.colorbar()
     plt.savefig(p.folderName + "nu.png")
+
+
+def save_coordinate_system(x, y, p):
+    np.savetxt(p.folderName + "x.csv", x, delimiter=",")
+    np.savetxt(p.folderName + "y.csv", y, delimiter=",")
+
+
+def plot_permeability(x, y, s, p, t):
+    """
+    Calculate and save the permeability of the domain at time t.
+    """
+    sphericity = 1
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", category=RuntimeWarning)
+        porosity = np.mean(np.isnan(s), axis=2)
+        s_bar = get_average(s)
+        permeability = sphericity**2 * (porosity**3) * s_bar**2 / (180 * (1 - porosity) ** 2)
+
+    plt.figure(fig)
+    plt.clf()
+    plt.pcolormesh(x, y, permeability.T, cmap="inferno")
+    plt.axis("off")
+    plt.xlim(x[0], x[-1])
+    plt.ylim(y[0], y[-1])
+    plt.subplots_adjust(left=0, right=1, bottom=0, top=1)
+    plt.savefig(p.folderName + "permeability_" + str(t).zfill(6) + ".png", dpi=100)
+
+    np.savetxt(p.folderName + "permeability_" + str(t).zfill(6) + ".csv", permeability, delimiter=",")
 
 
 def plot_s(x, y, s, p, t):
@@ -126,7 +200,7 @@ def plot_nu(x, y, s, p, t):
     if p.internal_geometry:
         nu = np.ma.masked_where(p.boundary.T, nu)
     plt.clf()
-    plt.pcolormesh(x, y, nu, cmap="inferno", vmin=0, vmax=1)
+    plt.pcolormesh(x, y, nu, cmap="inferno_r", vmin=0, vmax=1)
     if p.internal_geometry:
         if p.internal_geometry["perf_plate"]:
             for i in p.internal_geometry["perf_pts"]:
@@ -337,23 +411,24 @@ def stack_videos(paths, name, videos):
             )
             subprocess.run(cmd)  # , stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
-        cmd = ["ffmpeg", "-y"]
-        for video in videos:
-            cmd.extend(["-i", f"{video}_videos.mp4"])
-        cmd.extend(
-            [
-                *_video_encoding,
-                # "-c:v", "libx264", "-pix_fmt", "yuv420p",
-                "-filter_complex",
-                f"vstack=inputs={len(videos)}",
-                f"output/{name}.mp4",
-            ]
-        )
-        subprocess.run(cmd)  # , stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        if len(videos) > 1:
+            cmd = ["ffmpeg", "-y"]
+            for video in videos:
+                cmd.extend(["-i", f"{video}_videos.mp4"])
+            cmd.extend(
+                [
+                    *_video_encoding,
+                    # "-c:v", "libx264", "-pix_fmt", "yuv420p",
+                    "-filter_complex",
+                    f"vstack=inputs={len(videos)}",
+                    f"output/{name}.mp4",
+                ]
+            )
+            subprocess.run(cmd)  # , stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
-        cmd = ["rm"]
-        for video in videos:
-            cmd.append(f"{video}_videos.mp4")
-        subprocess.run(cmd)
+            cmd = ["rm"]
+            for video in videos:
+                cmd.append(f"{video}_videos.mp4")
+            subprocess.run(cmd)
     else:
         print("ffmpeg not installed, cannot make videos")

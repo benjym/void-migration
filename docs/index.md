@@ -13,3 +13,10 @@ A python package for simulating the motion of a granular material as a result of
 
 # Authors
 - [Benjy Marks](mailto:benjy.marks@sydney.edu.au)
+
+# Usage
+The code is run by calling `python void_migration/void_migration.py <json5 file>`. The parameters for the simulation are stored in the `json5` file. The default parameters, contained in `defaults.json5` are as follows:
+
+``` json
+{!defaults.json5!}
+```
