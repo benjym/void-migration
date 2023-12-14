@@ -1,0 +1,42 @@
+{
+    // resolution
+    nx : 10, // number of cells horizontally
+    ny : 10, // number of cells vertically
+    nm : 10,  // number of cells in internal direction
+    // aspect_ratio : 1, // ratio of horizontal to vertical resolution, if defined, overrides ny
+
+    // geometry
+    H : 1, // physical height of the system (m)
+    theta : 0, // angle of gravity (0 is vertical, degrees)
+    g : 9.81, // gravitational acceleration (m/s^2)
+    add_voids : "None", // "central_outlet", "multiple_outlets", "slope", "mara" or "pour"
+    internal_geometry : false, // true if internal geometry is present, currently defined only for a single case
+    cyclic_BC : false, // true if cyclic BCs are used horizontally
+    refill : false, // should the particles come back in the top if they leave the bottom
+    
+    // void migration model parameters
+    diag : 0,
+    lagrangian : false,
+    close_voids : false, // should the voids be closed after some time
+
+    // material properties
+    repose_angle : 30, // (degrees)
+    gsd_mode : 'bi', // 'mono', 'bi' or 'poly'
+    large_concentration: 0.5, // concentration of large particles for bidisperse case
+    s_m : 0.0005, // minimum particle size (m)
+    s_M : 0.001, // maximum particle size (m)
+    nu_cs : 0.5, // critical state solid volume fraction
+    beta : 1, // ratio of vertical to horizontal swapping probability
+    
+    // initial condition
+    fill_ratio : 0.25, // ratio of the domain that is filled with particles
+    nu_fill : 0.5, // solid fraction of the particles in the initial condition
+    IC_mode : "column", // where should the initial particles be, "column", "random", "top", "full" or "empty"
+    
+    // saving
+    save_inc : 1, // how often to save the state of the system (timesteps)
+    t_f : 5,  // final time to end the simulation (s)
+    videos : ['nu','s'], // which variables to save videos of.
+    save : ['nu','s'], // which variables to save. Should at least include the ones to make videos.
+    mask_s_bar : true, // should the images of s_bar be masked to hide areas of low density
+}

@@ -11,39 +11,46 @@ def swap(src, dst, arrays, nu, p):
     return [arrays, nu]
 
 
-def get_solid_fraction(s: np.ndarray, i: int, j: int) -> float:
+def get_solid_fraction(s: np.ndarray, loc: list | None = None) -> float:
     """Calculate solid fraction of a single physical in a 3D array.
 
     Args:
         s: a 3D numpy array
-        i: an integer representing a row index
-        j: an integer representing a column index
+        loc: Either None or a list of two integers.
 
     Returns:
         The fraction of the solid phase in s at (i, j) as a float.
     """
     # return np.mean(~np.isnan(s[i, j, :]))
-    return 1.0 - np.mean(np.isnan(s[i, j, :]))
+    if loc is None:
+        return 1.0 - np.mean(np.isnan(s, axis=2))
+    else:
+        return 1.0 - np.mean(np.isnan(s[loc[0], loc[1], :]))
 
 
-def get_average(s):
+def get_average(s, loc: list | None = None):
     """
     Calculate the mean size over the microstructural co-ordinate.
     """
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", category=RuntimeWarning)
-        s_bar = np.nanmean(np.nanmean(s, 2), 0)
+        if loc is None:
+            s_bar = np.nanmean(s, axis=2)
+        else:
+            s_bar = np.nanmean(s[loc[0], loc[1], :])
     return s_bar
 
 
-def get_hyperbolic_average(s):
+def get_hyperbolic_average(s: np.ndarray, loc: list | None = None) -> float:
     """
     Calculate the hyperbolic mean size over the microstructural co-ordinate.
     """
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", category=RuntimeWarning)
-        s_inv_bar = 1.0 / np.nanmean(1.0 / s, 2)
-    return s_inv_bar
+        if loc is None:
+            return 1.0 / np.nanmean(1.0 / s, axis=2)
+        else:
+            return 1.0 / np.nanmean(1.0 / s[loc[0], loc[1], :])
 
 
 def get_depth(s):
