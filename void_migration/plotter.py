@@ -56,6 +56,10 @@ grey = cm.get_cmap("gray")
 grey.set_bad("w", 0.0)
 bwr = cm.get_cmap("bwr")
 bwr.set_bad("k", 1.0)
+colors = [(1, 0, 0), (0, 0, 1)]
+cmap_name = 'my_list'
+cmap = LinearSegmentedColormap.from_list(cmap_name, colors, N=2)
+
 
 global fig, summary_fig
 
@@ -72,9 +76,9 @@ def set_plot_size(p):
     summary_fig = plt.figure()
 
 
-def make_saves(x, y, s, u, v, c, T, p, t):
+def make_saves(x, y, s, u, v, c, T, p, t, *args):
     if "s" in p.save:
-        plot_s(x, y, s, p, t)
+        plot_s(x, y, s, p, t, *args)
     if "nu" in p.save:
         plot_nu(x, y, s, p, t)
     if "rel_nu" in p.save:
@@ -150,6 +154,15 @@ def save_coordinate_system(x, y, p):
     np.savetxt(p.folderName + "x.csv", x, delimiter=",")
     np.savetxt(p.folderName + "y.csv", y, delimiter=",")
 
+def c_d_saves(p,mass_in_fun, non_zero_nu_time, *args):
+    np.save(p.folderName + "mass_in_fun.npy", mass_in_fun)
+    np.save(p.folderName + "nu_non_zero_avg.npy", non_zero_nu_time)
+    if p.gsd_mode == 'mono':
+        np.save(p.folderName + "cell_count.npy", args[0])
+    elif p.gsd_mode == 'bi':
+        np.save(p.folderName + "cell_count_s.npy", args[0])
+        np.save(p.folderName + "cell_count_l.npy", args[1])
+
 
 def plot_permeability(x, y, s, p, t):
     """
@@ -174,24 +187,19 @@ def plot_permeability(x, y, s, p, t):
     np.savetxt(p.folderName + "permeability_" + str(t).zfill(6) + ".csv", permeability, delimiter=",")
 
 
-def plot_s(x, y, s, p, t):
+def plot_s(x, y, s, p, t, *args):
     plt.figure(fig)
     plt.clf()
-    ##################### if charge_discharge and mono-disperse #####################################
-    colors = [(1, 0, 0), (0, 0, 1)]
-    cmap_name = 'my_list'
-    cmap = LinearSegmentedColormap.from_list(cmap_name, colors, N=2)
-    #################################################################################################
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", category=RuntimeWarning)
         s_plot = np.nanmean(s, axis=2).T
     s_plot = np.ma.masked_where(np.isnan(s_plot), s_plot)
-    # plt.pcolormesh(x, y, s_plot, cmap=orange_blue_cmap, vmin=p.s_m, vmax=p.s_M)
-    # plt.colorbar()
-    if p.charge_discharge:
-        # plt.pcolormesh(x, y, s_plot, cmap=orange_blue_cmap, vmin=p.s_m, vmax=p.s_M)
-        plt.pcolormesh(x, y, s_plot, cmap=cmap, vmin=0.000045, vmax=0.00004505)
 
+    if hasattr(p,"charge_discharge") and p.gsd_mode == 'mono':
+        plt.pcolormesh(x, y, s_plot, cmap=cmap, vmin = args[0][0], vmax = args[0][1])
+    else:
+        plt.pcolormesh(x, y, s_plot, cmap=orange_blue_cmap, vmin=p.s_m, vmax=p.s_M)
+        # plt.colorbar()
 
     if p.internal_geometry:
         for i in p.internal_geometry["perf_pts"]:
@@ -201,7 +209,8 @@ def plot_s(x, y, s, p, t):
     plt.ylim(y[0], y[-1])
     ticks = np.linspace(p.s_m, p.s_M, 3, endpoint=True)
     plt.subplots_adjust(left=0, right=1, bottom=0, top=1)
-    # plt.colorbar(shrink=0.8,location='top',pad = 0.01,ticks = ticks)#,label="grainsize [m]")
+    if hasattr(p,"plot_colorbar"):
+        plt.colorbar(shrink=0.8,location='top',pad = 0.01,ticks = ticks)
     plt.savefig(p.folderName + "s_" + str(t).zfill(6) + ".png", bbox_inches='tight',dpi=100)
 
 
@@ -220,8 +229,8 @@ def plot_nu(x, y, s, p, t):
     plt.xlim(x[0], x[-1])
     plt.ylim(y[0], y[-1])
     plt.subplots_adjust(left=0, right=1, bottom=0, top=1)
-    # plt.title("density", loc = "right")
-    # plt.colorbar(shrink=0.8,location='top',pad = 0.01)
+    if hasattr(p,"plot_colorbar"):
+        plt.colorbar(shrink=0.8,location='top',pad = 0.01)#,ticks = ticks)
     plt.savefig(p.folderName + "nu_" + str(t).zfill(6) + ".png", bbox_inches='tight',dpi=100)
 
 
@@ -242,7 +251,8 @@ def plot_relative_nu(x, y, s, p, t):
     plt.xlim(x[0], x[-1])
     plt.ylim(y[0], y[-1])
     plt.subplots_adjust(left=0, right=1, bottom=0, top=1)
-    # plt.colorbar(shrink=0.8,location='top',pad = 0.01)
+    if hasattr(p,"plot_colorbar"):
+        plt.colorbar(shrink=0.8,location='top',pad = 0.01)#,ticks = ticks)
     plt.savefig(p.folderName + "rel_nu_" + str(t).zfill(6) + ".png", bbox_inches='tight',dpi=100)
 
 
@@ -297,7 +307,8 @@ def plot_u(x, y, s, u, v, p, t):
     plt.xlim(x[0], x[-1])
     plt.ylim(y[0], y[-1])
     plt.subplots_adjust(left=0, right=1, bottom=0, top=1)
-    # plt.colorbar(shrink=0.8,location='top',pad = 0.01)
+    if hasattr(p,"plot_colorbar"):
+        plt.colorbar(shrink=0.8,location='top',pad = 0.01)#,ticks = ticks)
     plt.savefig(p.folderName + "U_mag_" + str(t).zfill(6) + ".png", bbox_inches='tight',dpi=100)
 
 
