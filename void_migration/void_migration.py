@@ -516,35 +516,6 @@ def close_voids(u, v, s):
     return u, v, s
 
 
-def mass_cal(nu,s,p):
-    '''
-    This function calculates the mass = \sum v_sphere * density of alumina particle * nu 
-    This is to cross check that this mass is close to ( no. of cells * v_sphere * density of alumina particle * nu_cs )
-    nu is not always same as nu_cs, it can be slightly low or high
-    '''
-
-    mass_fun = []
-
-    for j in range(p.ny):
-        mass_i = []
-        for i in range(p.nx):
-            mass_k = []
-            if nu[i,j] > 0.0:
-
-                for k in range(p.nm):
-                    if ~np.isnan(s[i,j,k]):
-                        mass_k.append((4/3)*np.pi*(s[i,j,k]/2)**3*3950)  ##  volume of sphere s[i,j,k] x density of alumina particle x solid fraction nu[i,j]
-
-            if len(mass_k) == 0:
-                mass_k = np.zeros(p.nm)                                      ##  when 0 cells, we have difficulty executing the next statement, so this trick
-
-            # mass_i.append(np.sum(np.array(mass_k)[~np.isnan(np.array(mass_k))]))   ##  sum of non-nan masses
-            mass_i.append(np.sum(mass_k))   
-        mass_fun.append(np.sum(mass_i))
-
-    return mass_fun
-
-
 def charge_discharge(p,op_arr,t,change_s_ms):
 
     '''
@@ -581,6 +552,7 @@ def charge_discharge(p,op_arr,t,change_s_ms):
     if t <= int(np.ceil(yj[0].get('t_fill')/p.dt)):   ##To always pick the time belonging to the first element in the array 
         if p.gsd_mode == 'mono':
             p.s_m = col_index
+            p.s_M = p.s_m
             p.add_voids = 'place_on_top' #'pour_base'
         else:
             p.add_voids = 'place_on_top'
@@ -607,50 +579,57 @@ def cals_in_cd(p):
     op_arr : holds the values for t_fill, t_settle and t_empty for each cycle and for a desired number of cycles  
 
     '''
-    if p.gsd_mode == 'mono':
-        v_sphere = (4/3) * np.pi * ((p.s_m + p.s_M)/2/2)**3   ## m^3
-    elif p.gsd_mode == 'bi':
-        v_sphere = (((4/3)*np.pi*(p.s_m/2)**3) + ((4/3)*np.pi*(p.s_M/2)**3)) / 2
-    else:
-        v_sphere = (4/3) * np.pi * ((p.s_m + p.s_M)/2/2)**3   ## m^3
+    if hasattr(p,"give_mass"):
 
-    rho_p = 3950    ## kg/m^3
+        M_of_each_cell = p.dy * p.dy * p.rho_p / p.nm
 
-    # Total mass
-    M_total = p.nx * p.ny * p.nm * v_sphere * rho_p * p.nu_cs
+        # Total mass = no. of non-nan cells * Mass of each cell 
+        M_total = p.nx * p.ny * p.nm * M_of_each_cell * p.nu_cs
 
-    free_par = 0.17             ## do not know why this. How to decide this?
+        free_par = 0.17             ## do not know why this. How to decide this?
 
-    # Mass per unit time
-    Mass_in_per_u_t = (p.half_width * 2 + 1) * p.nm * p.fill_ratio * v_sphere * rho_p #* p.nu_cs
-    Mass_out_per_u_t = (p.half_width * 2 + 1) * p.nm * free_par * v_sphere * rho_p #* p.nu_cs
+        # Mass per unit time
+        Mass_in_per_u_t = (p.half_width * 2 + 1) * p.nm * p.fill_ratio * M_of_each_cell 
+        Mass_out_per_u_t = (p.half_width * 2 + 1) * p.nm * p.free_par * M_of_each_cell 
 
-    # Mass in
-    Mass_in = [M_total/2,M_total/2,M_total/2]
+        # Mass in
+        Mass_in = M_total * np.array(list(p.M_ins.values()))
 
-    # Mass out
-    Mass_out = [Mass_in[0]/1.1,Mass_in[1]/1.1,Mass_in[2]/1.1]
+        # Mass out
+        Mass_out = Mass_in * np.array(list(p.M_empty.values()))
 
-    # Time in 
-    T_in = [int((Mass_in[0]/Mass_in_per_u_t)*p.dt),int((Mass_in[1]/Mass_in_per_u_t)*p.dt),int((Mass_in[2]/Mass_in_per_u_t)*p.dt)]
+        # Time in 
+        T_in = [int((Mass_in[0]/Mass_in_per_u_t)*p.dt),int((Mass_in[1]/Mass_in_per_u_t)*p.dt),int((Mass_in[2]/Mass_in_per_u_t)*p.dt)]
 
-    # Time settle 
-    T_settle = [3, 3, 3]
+        # Time settle 
+        T_settle = np.array(list(p.T_settle.values()))
 
-    # Time out
-    T_out = [int((Mass_out[0]/Mass_out_per_u_t)*p.dt), int((Mass_out[1]/Mass_out_per_u_t)*p.dt), int((Mass_out[2]/Mass_out_per_u_t)*p.dt)]
+        # Time out
+        T_out = [int((Mass_out[0]/Mass_out_per_u_t)*p.dt), int((Mass_out[1]/Mass_out_per_u_t)*p.dt), int((Mass_out[2]/Mass_out_per_u_t)*p.dt)]
 
-    print(T_in,T_settle,T_out)
+        tmp = 0
+    
+        for i in range(p.no_of_cycles):
 
-    tmp = 0
-    for i in range(p.no_of_cycles):
+            T_in[i] = T_in[i] + tmp
+            T_settle[i] = T_settle[i] + T_in[i]
+            T_out[i] = T_out[i] + T_settle[i]
+            tmp = T_out[i]
 
-        T_in[i] = T_in[i] + tmp
-        T_settle[i] = T_settle[i] + T_in[i]
-        T_out[i] = T_out[i] + T_settle[i]
-        tmp = T_out[i]
+    if hasattr(p,"give_time") and hasattr(p, "T_in") and hasattr(p, "T_settle") and hasattr(p, "T_empty"):
+        T_in = list(p.T_in.values())
+        T_settle = list(p.T_settle.values())
+        T_out = list(p.T_empty.values())
+        tmp = 0
+        for i in range(p.no_of_cycles):
 
+            T_in[i] = T_in[i] + tmp
+            T_settle[i] = T_settle[i] + T_in[i]
+            T_out[i] = T_out[i] + T_settle[i]
+            tmp = T_out[i]
+        
     all_Ts = np.transpose([T_in,T_settle,T_out])   ## to arange the times in a cycle fashion
+
 
     # Initialize dictionary
     times = ["t_fill","t_settle","t_empty"]
@@ -661,9 +640,25 @@ def cals_in_cd(p):
     for j in range(p.no_of_cycles):
         op_arr[j] = {key: all_Ts[j][i] for i, key in enumerate(op_arr[j])}   ##assigned the values for times t_fill t_settle and t_empty
 
-    # print("EEEEEEEEEEEEEE",op_arr)
-
     return op_arr
+
+def save_quantities(p,s):
+    p_count = 0 
+    p_count_s = 0
+    p_count_l = 0 
+    non_zero_nu_time = 0
+
+    if p.gsd_mode == 'mono':
+        p_count = np.count_nonzero(s[~np.isnan(s)])
+    elif p.gsd_mode == 'bi':
+        p_count_s = np.count_nonzero(s[~np.isnan(s)] == p.s_m)
+        p_count_l = np.count_nonzero(s[~np.isnan(s)] == p.s_M)
+
+    non_zero_avg_nu = 1 - np.mean(np.isnan(s), axis=2)          ##get the solid fraction
+    non_zero_nu_time = np.mean(non_zero_avg_nu[np.nonzero(non_zero_avg_nu)])  ##get the avg solid fraction ignoring the zeros
+
+    return p_count, p_count_s, p_count_l, non_zero_nu_time
+
 
 
 def time_march(p):
@@ -688,7 +683,7 @@ def time_march(p):
     # p.P_u_ref = 1.0 / (1.0 + 1.0 / p.beta) * (p.s_m / p.s_M)
     # p.P_lr_ref = p.P_u_ref / (2 * p.beta)
     # p.dt = p.P_u_ref * p.dy / p.free_fall_velocity
-
+    s_ms = [0,0]
     change_s_ms = [p.s_m,p.s_m + p.s_m/1000]
 
     safe = False
@@ -711,10 +706,11 @@ def time_march(p):
             stability *= 0.95
 
     if hasattr(p,"charge_discharge"):
-        if hasattr(p,"give_mass"):
+        if (hasattr(p,"give_mass")) or (hasattr(p,"give_time") and hasattr(p, "T_in") and hasattr(p, "T_settle") and hasattr(p, "T_empty")):
             op_arr = cals_in_cd(p)      ## get the time cycles
-        if hasattr(p,"give_time"):
-            op_arr = [{'t_fill': 10, 't_settle': 13, 't_empty': 14}, {'t_fill': 25, 't_settle': 28, 't_empty': 30}, {'t_fill': 35, 't_settle': 38, 't_empty': 40}]
+        
+        else:
+            op_arr = p.T_cycles
 
         p.nt = int(np.ceil(op_arr[-1].get('t_empty') / p.dt))     ## cal the number of steps based on final t_empty
 
@@ -730,7 +726,11 @@ def time_march(p):
     s = IC(p)  # non-dimensional size
     u = np.zeros([p.nx, p.ny])
     v = np.zeros([p.nx, p.ny])
+    p_count = np.zeros([p.nt])
+    p_count_s = np.zeros([p.nt])
+    p_count_l = np.zeros([p.nt])
     non_zero_nu_time = np.zeros([p.nt])
+
 
     if hasattr(p, "concentration"):
         c = np.zeros_like(s)  # original bin that particles started in
@@ -763,17 +763,9 @@ def time_march(p):
 
     plotter.save_coordinate_system(x, y, p)
 
-    if hasattr(p,"charge_discharge"):
-        plotter.make_saves(x, y, s, u, v, c, T, p, t, change_s_ms)
-    else:
-        plotter.make_saves(x, y, s, u, v, c, T, p, t)
+    plotter.make_saves(x, y, s, u, v, c, T, p, t, s_ms)
 
-    # plotter.make_saves(x, y, s, u, v, c, T, p, t)
     outlet = []
-    p_count = []
-    p_count_s = []
-    p_count_l = []
-    mass_in_fun = []
 
     N_swap = None
 
@@ -793,17 +785,7 @@ def time_march(p):
 
         if hasattr(p,"charge_discharge"):
             p,s_ms = charge_discharge(p,op_arr,t,change_s_ms)
-            if p.gsd_mode == 'mono':
-                p_count.append(np.count_nonzero(s[~np.isnan(s)]))
-            elif p.gsd_mode == 'bi':
-                p_count_s.append(np.count_nonzero(s[~np.isnan(s)] == p.s_m))
-                p_count_l.append(np.count_nonzero(s[~np.isnan(s)] == p.s_M))
-
-            den = 1 - np.mean(np.isnan(s), axis=2)
-            mass_in_fun.append(np.sum(mass_cal(den,s,p)))
-
-            non_zero_avg_nu = 1 - np.mean(np.isnan(s), axis=2)          ##get the solid fraction
-            non_zero_nu_time[t] = np.mean(non_zero_avg_nu[np.nonzero(non_zero_avg_nu)])  ##get the avg solid fraction ignoring the zeros
+            p_count[t],p_count_s[t],p_count_l[t],non_zero_nu_time[t] = save_quantities(p,s)
 
         u, v, s, c, T, N_swap = move_voids(u, v, s, p, c=c, T=T, N_swap=N_swap)
 
@@ -820,10 +802,7 @@ def time_march(p):
             u, v, s = close_voids(u, v, s)
 
         if t % p.save_inc == 0:
-            if hasattr(p,"charge_discharge"):
-                plotter.make_saves(x, y, s, u, v, c, T, p, t, s_ms)
-            else:
-                plotter.make_saves(x, y, s, u, v, c, T, p, t)
+            plotter.make_saves(x, y, s, u, v, c, T, p, t, s_ms)
 
         # s_bar_time[t] = s_bar  # save average size
         # u_time[t] = np.mean(u, axis=0)
@@ -832,14 +811,9 @@ def time_march(p):
 
         t += 1
     if hasattr(p,"charge_discharge"):
-        if p.gsd_mode == 'mono':
-            plotter.c_d_saves(p,mass_in_fun, non_zero_nu_time, p_count)
-        elif p.gsd_mode == 'bi':
-            plotter.c_d_saves(p,mass_in_fun, non_zero_nu_time, p_count_s, p_count_l)
+        plotter.c_d_saves(p, non_zero_nu_time, p_count, p_count_s, p_count_l)
 
-        plotter.make_saves(x, y, s, u, v, c, T, p, t, s_ms)
-    else:
-        plotter.make_saves(x, y, s, u, v, c, T, p, t)
+    plotter.make_saves(x, y, s, u, v, c, T, p, t, s_ms)
     
 
 

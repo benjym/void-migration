@@ -39,4 +39,5 @@
     videos : ['nu','s'], // which variables to save videos of.
     save : ['nu','s'], // which variables to save. Should at least include the ones to make videos.
     mask_s_bar : true, // should the images of s_bar be masked to hide areas of low density
+    T_cycles : [{'t_fill': 10, 't_settle': 13, 't_empty': 14}, {'t_fill': 25, 't_settle': 28, 't_empty': 30}, {'t_fill': 35, 't_settle': 38, 't_empty': 40}], //no. of dict should be equal to no. of cycles
 }

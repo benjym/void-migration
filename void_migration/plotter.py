@@ -78,7 +78,10 @@ def set_plot_size(p):
 
 def make_saves(x, y, s, u, v, c, T, p, t, *args):
     if "s" in p.save:
-        plot_s(x, y, s, p, t, *args)
+        if hasattr(p,"charge_discharge"):
+            plot_s(x, y, s, p, t, *args)
+        else:
+            plot_s(x, y, s, p, t)
     if "nu" in p.save:
         plot_nu(x, y, s, p, t)
     if "rel_nu" in p.save:
@@ -154,8 +157,7 @@ def save_coordinate_system(x, y, p):
     np.savetxt(p.folderName + "x.csv", x, delimiter=",")
     np.savetxt(p.folderName + "y.csv", y, delimiter=",")
 
-def c_d_saves(p,mass_in_fun, non_zero_nu_time, *args):
-    np.save(p.folderName + "mass_in_fun.npy", mass_in_fun)
+def c_d_saves(p, non_zero_nu_time, *args):
     np.save(p.folderName + "nu_non_zero_avg.npy", non_zero_nu_time)
     if p.gsd_mode == 'mono':
         np.save(p.folderName + "cell_count.npy", args[0])
