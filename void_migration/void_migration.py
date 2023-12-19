@@ -10,10 +10,12 @@ __version__ = "0.3"
 
 import sys
 import numpy as np
+import concurrent.futures
 from tqdm import tqdm
 from itertools import product
 from numpy.typing import ArrayLike
-from scipy.ndimage import maximum_filter
+
+# from scipy.ndimage import maximum_filter
 
 # from numba import jit, njit
 import plotter
@@ -37,7 +39,11 @@ def IC(p):
 
     # pick a grain size distribution
     if p.gsd_mode == "mono":
-        s = p.s_m * np.ones([p.nx, p.ny, p.nm])  # monodisperse
+        s = np.nan * np.ones([p.nx, p.ny, p.nm])  # monodisperse
+        for i in range(p.nx):
+            for j in range(p.ny):
+                fill = rng.choice(p.nm, size=int(p.nm * p.nu_fill), replace=False)
+                s[i, j, fill] = p.s_m
         p.s_M = p.s_m
     if p.gsd_mode == "bi":  # bidisperse
         if (p.nm * p.large_concentration * p.nu_fill) < 2:
@@ -55,7 +61,7 @@ def IC(p):
                         remaining, size=int(p.nm * (1 - p.large_concentration) * p.nu_fill), replace=False
                     )
                     s[i, j, small] = p.s_m
-                    pre_masked = True
+            pre_masked = True
     elif p.gsd_mode == "poly":  # polydisperse
         # s_0 = p.s_m / (1.0 - p.s_m)  # intermediate calculation
         s_non_dim = np.random.rand(p.nm)
@@ -82,11 +88,6 @@ def IC(p):
             mask[
                 p.nx // 2 - int(p.fill_ratio / 2 * p.nx) : p.nx // 2 + int(p.fill_ratio / 2 * p.nx), :, :
             ] = False
-
-            # for i in range(p.nx):
-            #     for j in range(p.ny):
-            #         this_mask = rng.choice(p.nm, size=int(p.nm*(1-p.fill_density)), replace=False)
-            #         mask[i, j, this_mask] = True
 
             mask[
                 :, -1, :
@@ -119,29 +120,10 @@ def stable_slope(
     Returns:
         True if the void should NOT swap with a solid particle (i.e. the slope is stable). False otherwise.
     """
-    # if p.mu <= 1:
-    # if (
-    #     solid_fraction(s, i + lr, j) - solid_fraction(s, i - lr, j)
-    # ) < p.mu * p.nu_cs:# and (
-    if ((nu[dest, j] > nu[i, j]) and (nu[dest, j] - nu[i, j]) < p.mu * p.nu_cs) and (
-        nu[i, j + 1] == 0
-    ):  # where did the 2 come from???
-        # print('STABLE')
+    if ((nu[dest, j] > nu[i, j]) and (nu[dest, j] - nu[i, j]) < p.mu * p.nu_cs) and (nu[i, j + 1] == 0):
         return True
     else:
         return False
-    # else:
-    # if (
-    #     solid_fraction(s, i + lr, j+1) - solid_fraction(s, i - lr, j-1) + 2
-    # ) < 2*p.mu * p.nu_cs:  # HACK - WHY IS IT NOT DIVIDED BY 2??
-    #     return True
-    # sys.exit('Friction angles above 45 degrees not yet implemented')
-
-    # print(dnu_dx[i,j])
-    # if np.abs(dnu_dx[i,j]) < p.mu*p.nu_cs/2.:
-    #     return True
-    # else:
-    #     return False
 
 
 # @njit
@@ -342,7 +324,7 @@ def move_voids(
     return u, v, s, c, T, N_swap
 
 
-def add_voids(u, v, s, c, outlet):
+def add_voids(u, v, s, p, c, outlet):
     if p.add_voids == "central_outlet":  # Remove at central outlet - use this one
         for i in range(p.nx // 2 - p.half_width, p.nx // 2 + p.half_width + 1):
             for k in range(p.nm):
@@ -482,22 +464,14 @@ def time_march(p):
     t = 0
 
     p.t_p = p.s_m / np.sqrt(p.g * p.H)  # smallest confinement timescale (at bottom) (s)
-    p.free_fall_velocity = np.sqrt(p.g * p.dy)  # time to fall one cell (s)
-
-    # Define reference probabilities
-    # p.P_u_ref = 1.0 / (1.0 + 1.0 / p.beta) * (p.s_m / p.s_M)
-    # p.P_lr_ref = p.P_u_ref / (2 * p.beta)
-    # p.dt = p.P_u_ref * p.dy / p.free_fall_velocity
+    p.free_fall_velocity = np.sqrt(p.g * (p.s_m + p.s_M) / 2.0)  # time to fall one mean diameter (s)
 
     safe = False
     stability = 0.5
     while not safe:
         p.P_u_ref = stability
         p.dt = p.P_u_ref * p.dy / p.free_fall_velocity
-        # p.P_lr_ref = p.beta * p.dt / p.dy / p.dy # NOTE: p.beta HAS UNITS OF VELOCITY!!
-        p.P_lr_ref = p.P_u_ref / (
-            2 * p.beta
-        )  # * p.free_fall_velocity * p.dt / p.dy / p.dy  # NOTE: BETA IS DIMENSIONLESS
+        p.P_lr_ref = p.alpha * p.P_u_ref
 
         p.P_u_max = p.P_u_ref * (p.s_M / p.s_m)
         p.P_lr_max = p.P_lr_ref * (p.s_M / p.s_m)
@@ -508,11 +482,6 @@ def time_march(p):
             stability *= 0.95
 
     p.nt = int(np.ceil(p.t_f / p.dt))
-
-    # s_bar_time = np.zeros([p.nt, p.ny])
-    # nu_time = np.zeros_like(s_bar_time)
-    # nu_time_x = np.zeros([p.nt, p.nx])
-    # u_time = np.zeros_like(s_bar_time)
 
     s = IC(p)  # non-dimensional size
     u = np.zeros([p.nx, p.ny])
@@ -543,75 +512,77 @@ def time_march(p):
     if hasattr(p, "temperature"):
         T = p.temperature["inlet_temperature"] * np.ones_like(s)
         T[np.isnan(s)] = np.nan
-        outlet_T = []
     else:
         T = None
 
     plotter.save_coordinate_system(x, y, p)
-    plotter.make_saves(x, y, s, u, v, c, T, p, t)
+    plotter.update(x, y, s, u, v, c, T, p, t)
     outlet = []
     N_swap = None
 
     params.indices = np.arange(p.nx * (p.ny - 1) * p.nm)
     np.random.shuffle(params.indices)
 
-    for t in tqdm(range(1, p.nt), leave=False, desc="Time"):
+    for t in tqdm(range(1, p.nt), leave=False, desc="Time", position=p.concurrent_index + 1):
         outlet.append(0)
         u = np.zeros_like(u)
         v = np.zeros_like(v)
 
-        # depth = operators.get_depth(s)
-        # s_bar = operators.get_average(s)
-        # s_inv_bar = operators.get_hyperbolic_average(s)
         if hasattr(p, "temperature"):
-            T = thermal.update_temperature(s, T, p)  # delete the particles at the bottom of the hopper
+            T = thermal.update_temperature(s, T, p)
 
         u, v, s, c, T, N_swap = move_voids(u, v, s, p, c=c, T=T, N_swap=N_swap)
 
-        # if t % 2 == 0:
-        # u, v, s, c, T = move_voids_adv(u, v, s, c, T, boundary)
-        # u, v, s, c, T = move_voids_diff(u, v, s, c, T, boundary)
-        # else:
-        # u, v, s, c, T = move_voids_diff(u, v, s, c, T, boundary)
-        # u, v, s, c, T = move_voids_adv(u, v, s, c, T, boundary)
-
-        u, v, s, c, outlet = add_voids(u, v, s, c, outlet)
+        u, v, s, c, outlet = add_voids(u, v, s, p, c, outlet)
 
         if p.close_voids:
             u, v, s = close_voids(u, v, s)
 
         if t % p.save_inc == 0:
-            plotter.make_saves(x, y, s, u, v, c, T, p, t)
+            plotter.update(x, y, s, u, v, c, T, p, t)
 
-        # s_bar_time[t] = s_bar  # save average size
-        # u_time[t] = np.mean(u, axis=0)
-        # nu_time[t] = np.mean(1 - np.mean(np.isnan(s), axis=2), axis=0)
-        # nu_time_x[t] = np.mean(1 - np.mean(np.isnan(s), axis=2), axis=1)
         t += 1
 
-    plotter.make_saves(x, y, s, u, v, c, T, p, t)
+    plotter.update(x, y, s, u, v, c, T, outlet, p, t)
+
+
+def run_simulation(sim_with_index):
+    index, sim = sim_with_index
+    with open(sys.argv[1], "r") as f:
+        dict, p_init = params.load_file(f)
+    folderName = f"output/{dict['input_filename']}/"
+    dict_copy = dict.copy()
+    for i, key in enumerate(p_init.list_keys):
+        dict_copy[key] = sim[i]
+        folderName += f"{key}_{sim[i]}/"
+    p = params.dict_to_class(dict_copy)
+    p.concurrent_index = index
+    p.folderName = folderName
+    p.set_defaults()
+    time_march(p)
+    plotter.make_video(p)
+    return folderName
 
 
 if __name__ == "__main__":
     with open(sys.argv[1], "r") as f:
         dict, p_init = params.load_file(f)
 
-        # run simulations
-        all_sims = list(product(*p_init.lists))
-        folderNames = []
-        for sim in tqdm(all_sims, desc="Sim", leave=False):
-            folderName = f"output/{dict['input_filename']}/"
-            dict_copy = dict.copy()
-            for i, key in enumerate(p_init.list_keys):
-                dict_copy[key] = sim[i]
-                folderName += f"{key}_{sim[i]}/"
-            p = params.dict_to_class(dict_copy)
-            p.folderName = folderName
-            p.set_defaults()
-            folderNames.append(folderName)
-            time_march(p)
-            videoName = f"{p.folderName}/video.mp4"
-            plotter.make_video(p)
+    # run simulations
+    all_sims = list(product(*p_init.lists))
+
+    folderNames = []
+    with concurrent.futures.ProcessPoolExecutor() as executor:
+        results = list(
+            tqdm(
+                executor.map(run_simulation, enumerate(all_sims)),
+                total=len(all_sims),
+                desc="Sim",
+                leave=False,
+            )
+        )
+
+    folderNames.extend(results)
 
     if len(all_sims) > 1:
-        plotter.stack_videos(folderNames, dict["input_filename"], p.videos)
+        plotter.stack_videos(folderNames, dict["input_filename"], p_init.videos)

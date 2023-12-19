@@ -23,7 +23,7 @@ def get_solid_fraction(s: np.ndarray, loc: list | None = None) -> float:
     """
     # return np.mean(~np.isnan(s[i, j, :]))
     if loc is None:
-        return 1.0 - np.mean(np.isnan(s, axis=2))
+        return 1.0 - np.mean(np.isnan(s), axis=2)
     else:
         return 1.0 - np.mean(np.isnan(s[loc[0], loc[1], :]))
 

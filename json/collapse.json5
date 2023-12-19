@@ -15,7 +15,7 @@
     s_m : 0.001, // minimum particle size (m)
     // s_M : 0.01, // maximum particle size (m)
     nu_cs : 0.5,
-    beta : 1.0,
+    alpha : 1.0,
     
     // initial condition:
     fill_ratio : 0.25,

@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 from matplotlib.colors import LinearSegmentedColormap
 import matplotlib.cm as cm
 import warnings
-from operators import get_average
+from operators import get_average, get_solid_fraction
 
 # _video_encoding = ["-c:v", "libx265", "-preset", "fast", "-crf", "28", "-tag:v", "hvc1"] # nice small file sizes
 _video_encoding = [
@@ -72,28 +72,40 @@ def set_plot_size(p):
     summary_fig = plt.figure()
 
 
-def make_saves(x, y, s, u, v, c, T, p, t):
-    if "s" in p.save:
+def update(x, y, s, u, v, c, T, outlet, p, t):
+    if "s" in p.plot:
         plot_s(x, y, s, p, t)
-    if "nu" in p.save:
+    if "nu" in p.plot:
         plot_nu(x, y, s, p, t)
-    if "rel_nu" in p.save:
+    if "rel_nu" in p.plot:
         plot_relative_nu(x, y, s, p, t)
-    if "U_mag" in p.save:
+    if "U_mag" in p.plot:
         plot_u(x, y, s, u, v, p, t)
-    if "concentration" in p.save:
+    if "concentration" in p.plot:
         plot_c(x, y, s, c, p.folderName, t, p.internal_geometry)
+    if "temperature" in p.plot:
+        plot_T(x, y, s, T, p, t)
+    if "density_profile" in p.plot:
+        plot_profile(x, nu_time_x, p)
+    if "permeability" in p.plot:
+        plot_permeability(x, y, s, p, t)
+
+    if "s" in p.save:
+        save_s(x, y, s, p, t)
+    if "nu" in p.save:
+        save_nu(x, y, s, p, t)
+    if "rel_nu" in p.save:
+        save_relative_nu(x, y, s, p, t)
+    if "U_mag" in p.save:
+        save_u(x, y, s, u, v, p, t)
+    if "concentration" in p.save:
+        save_c(c, p.folderName, t)
     if "outlet" in p.save:
         np.savetxt(p.folderName + "outlet.csv", np.array(outlet), delimiter=",")
     if "temperature" in p.save:
-        plot_T(x, y, s, T, p, t)
         np.savetxt(p.folderName + "outlet_T.csv", np.array(outlet_T), delimiter=",")
     if "velocity" in p.save:
         np.savetxt(p.folderName + "u.csv", u / np.sum(np.isnan(s), axis=2), delimiter=",")
-    if "density_profile" in p.save:
-        plot_profile(x, nu_time_x, p)
-    if "permeability" in p.save:
-        plot_permeability(x, y, s, p, t)
 
 
 def plot_u_time(y, U, nu_time, p):
@@ -171,6 +183,8 @@ def plot_permeability(x, y, s, p, t):
     plt.subplots_adjust(left=0, right=1, bottom=0, top=1)
     plt.savefig(p.folderName + "permeability_" + str(t).zfill(6) + ".png", dpi=100)
 
+
+def save_permeability(x, y, s, p, t):
     np.savetxt(p.folderName + "permeability_" + str(t).zfill(6) + ".csv", permeability, delimiter=",")
 
 
@@ -190,8 +204,12 @@ def plot_s(x, y, s, p, t):
     plt.xlim(x[0], x[-1])
     plt.ylim(y[0], y[-1])
     plt.subplots_adjust(left=0, right=1, bottom=0, top=1)
-    plt.colorbar(shrink=0.8,location='top',pad = 0.01)
-    plt.savefig(p.folderName + "s_" + str(t).zfill(6) + ".png", bbox_inches='tight',dpi=100)
+    # plt.colorbar(shrink=0.8,location='top',pad = 0.01)
+    plt.savefig(p.folderName + "s_" + str(t).zfill(6) + ".png")  # , bbox_inches="tight", dpi=100)
+
+
+def save_s(x, y, s, p, t):
+    np.save(p.folderName + "s_" + str(t).zfill(6) + ".npy", get_average(s))
 
 
 def plot_nu(x, y, s, p, t):
@@ -209,8 +227,16 @@ def plot_nu(x, y, s, p, t):
     plt.xlim(x[0], x[-1])
     plt.ylim(y[0], y[-1])
     plt.subplots_adjust(left=0, right=1, bottom=0, top=1)
-    plt.colorbar(shrink=0.8,location='top',pad = 0.01)
-    plt.savefig(p.folderName + "nu_" + str(t).zfill(6) + ".png", bbox_inches='tight',dpi=100)
+    # plt.colorbar(shrink=0.8,location='top',pad = 0.01)
+    plt.savefig(p.folderName + "nu_" + str(t).zfill(6) + ".png")  # , bbox_inches="tight", dpi=100)
+
+
+def save_nu(x, y, s, p, t):
+    np.save(p.folderName + "nu_" + str(t).zfill(6) + ".npy", get_solid_fraction(s))
+
+
+def save_relative_nu(x, y, s, p, t):
+    np.save(p.folderName + "nu_" + str(t).zfill(6) + ".npy", get_solid_fraction(s) / p.nu_cs)
 
 
 def plot_relative_nu(x, y, s, p, t):
@@ -230,8 +256,8 @@ def plot_relative_nu(x, y, s, p, t):
     plt.xlim(x[0], x[-1])
     plt.ylim(y[0], y[-1])
     plt.subplots_adjust(left=0, right=1, bottom=0, top=1)
-    plt.colorbar(shrink=0.8,location='top',pad = 0.01)
-    plt.savefig(p.folderName + "rel_nu_" + str(t).zfill(6) + ".png", bbox_inches='tight',dpi=100)
+    # plt.colorbar(shrink=0.8,location='top',pad = 0.01)
+    plt.savefig(p.folderName + "rel_nu_" + str(t).zfill(6) + ".png")  # , bbox_inches="tight", dpi=100)
 
 
 def plot_u(x, y, s, u, v, p, t):
@@ -285,8 +311,8 @@ def plot_u(x, y, s, u, v, p, t):
     plt.xlim(x[0], x[-1])
     plt.ylim(y[0], y[-1])
     plt.subplots_adjust(left=0, right=1, bottom=0, top=1)
-    plt.colorbar(shrink=0.8,location='top',pad = 0.01)
-    plt.savefig(p.folderName + "U_mag_" + str(t).zfill(6) + ".png", bbox_inches='tight',dpi=100)
+    # plt.colorbar(shrink=0.8,location='top',pad = 0.01)
+    plt.savefig(p.folderName + "U_mag_" + str(t).zfill(6) + ".png")  # , bbox_inches="tight", dpi=100)
 
 
 def plot_c(x, y, s, c, folderName, t, internal_geometry):
@@ -306,6 +332,10 @@ def plot_c(x, y, s, c, folderName, t, internal_geometry):
     plt.ylim(y[0], y[-1])
     plt.subplots_adjust(left=0, right=1, bottom=0, top=1)
     plt.savefig(folderName + "c_" + str(t).zfill(6) + ".png", dpi=100)
+
+
+def save_c(c, folderName, t):
+    np.save(folderName + "c_" + str(t).zfill(6) + ".npy", np.nanmean(c, axis=2))
 
 
 def plot_outlet(outlet, folderName):
@@ -378,8 +408,8 @@ def make_video(p):
             cmd.extend(["-r", "30", *_video_encoding, f"{p.folderName}/{video}_video.mp4"])
             subprocess.run(
                 cmd,
-                # stdout=subprocess.DEVNULL,
-                # stderr=subprocess.DEVNULL,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
             )
     else:
         print("ffmpeg not installed, cannot make videos")
@@ -409,7 +439,7 @@ def stack_videos(paths, name, videos):
                     f"{video}_videos.mp4",
                 ]
             )
-            subprocess.run(cmd)  # , stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
         if len(videos) > 1:
             cmd = ["ffmpeg", "-y"]
@@ -424,7 +454,7 @@ def stack_videos(paths, name, videos):
                     f"output/{name}.mp4",
                 ]
             )
-            subprocess.run(cmd)  # , stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
             cmd = ["rm"]
             for video in videos:

@@ -14,7 +14,7 @@ class dict_to_class:
         lists: List[List] = []
         for key in dict:
             setattr(self, key, dict[key])
-            if isinstance(dict[key], list) and key not in ["save", "videos"]:
+            if isinstance(dict[key], list) and key not in ["save", "plot", "videos"]:
                 list_keys.append(key)
                 lists.append(dict[key])
         setattr(self, "lists", lists)
@@ -56,6 +56,7 @@ class dict_to_class:
 def load_file(f):
     # parse file
     dict = json5.loads(f.read())
-    dict["input_filename"] = (sys.argv[1].split("/")[-1]).split(".")[0]
+    if len(sys.argv) > 1:
+        dict["input_filename"] = (sys.argv[1].split("/")[-1]).split(".")[0]
     p = dict_to_class(dict)
     return dict, p

@@ -26,7 +26,7 @@
     s_m : 0.0005, // minimum particle size (m)
     s_M : 0.001, // maximum particle size (m)
     nu_cs : 0.5, // critical state solid volume fraction
-    beta : 1, // ratio of vertical to horizontal swapping probability
+    alpha : 1, // ratio of horizontal to vertical swapping probability
     
     // initial condition
     fill_ratio : 0.25, // ratio of the domain that is filled with particles
@@ -36,7 +36,8 @@
     // saving
     save_inc : 1, // how often to save the state of the system (timesteps)
     t_f : 5,  // final time to end the simulation (s)
+    plot : ['nu', 's'], // which variables to plot. Should at least include the ones to make videos.
     videos : ['nu','s'], // which variables to save videos of.
-    save : ['nu','s'], // which variables to save. Should at least include the ones to make videos.
+    save : [], // which variables to save. By default none.
     mask_s_bar : true, // should the images of s_bar be masked to hide areas of low density
 }
