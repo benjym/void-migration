@@ -39,4 +39,5 @@
     videos : ['nu','s'], // which variables to save videos of.
     save : ['nu','s'], // which variables to save. Should at least include the ones to make videos.
     mask_s_bar : true, // should the images of s_bar be masked to hide areas of low density
+    T_cycles : [], // a list containing dicts that define any cycles
 }
