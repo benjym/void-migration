@@ -57,7 +57,7 @@ grey.set_bad("w", 0.0)
 bwr = cm.get_cmap("bwr")
 bwr.set_bad("k", 1.0)
 colors = [(1, 0, 0), (0, 0, 1)]
-cmap_name = 'my_list'
+cmap_name = "my_list"
 cmap = LinearSegmentedColormap.from_list(cmap_name, colors, N=2)
 
 
@@ -78,7 +78,7 @@ def set_plot_size(p):
 
 def update(x, y, s, u, v, c, T, outlet, p, t, *args):
     if "s" in p.plot:
-        if hasattr(p,"charge_discharge"):
+        if hasattr(p, "charge_discharge"):
             plot_s(x, y, s, p, t, *args)
         else:
             plot_s(x, y, s, p, t)
@@ -174,9 +174,9 @@ def save_coordinate_system(x, y, p):
 
 def c_d_saves(p, non_zero_nu_time, *args):
     np.save(p.folderName + "nu_non_zero_avg.npy", non_zero_nu_time)
-    if p.gsd_mode == 'mono':
+    if p.gsd_mode == "mono":
         np.save(p.folderName + "cell_count.npy", args[0])
-    elif p.gsd_mode == 'bi':
+    elif p.gsd_mode == "bi":
         np.save(p.folderName + "cell_count_s.npy", args[0])
         np.save(p.folderName + "cell_count_l.npy", args[1])
 
@@ -214,8 +214,8 @@ def plot_s(x, y, s, p, t, *args):
         s_plot = np.nanmean(s, axis=2).T
     s_plot = np.ma.masked_where(np.isnan(s_plot), s_plot)
 
-    if hasattr(p,"charge_discharge") and p.gsd_mode == 'mono':
-        plt.pcolormesh(x, y, s_plot, cmap=cmap, vmin = args[0][0], vmax = args[0][1])
+    if hasattr(p, "charge_discharge") and p.gsd_mode == "mono":
+        plt.pcolormesh(x, y, s_plot, cmap=cmap, vmin=args[0][0], vmax=args[0][1])
     else:
         plt.pcolormesh(x, y, s_plot, cmap=orange_blue_cmap, vmin=p.s_m, vmax=p.s_M)
         # plt.colorbar()
@@ -228,8 +228,8 @@ def plot_s(x, y, s, p, t, *args):
     plt.ylim(y[0], y[-1])
     ticks = np.linspace(p.s_m, p.s_M, 3, endpoint=True)
     plt.subplots_adjust(left=0, right=1, bottom=0, top=1)
-    if hasattr(p,"plot_colorbar"):
-        plt.colorbar(shrink=0.8,location='top',pad = 0.01,ticks = ticks)
+    if hasattr(p, "plot_colorbar"):
+        plt.colorbar(shrink=0.8, location="top", pad=0.01, ticks=ticks)
     plt.savefig(p.folderName + "s_" + str(t).zfill(6) + ".png")
 
 
@@ -252,8 +252,8 @@ def plot_nu(x, y, s, p, t):
     plt.xlim(x[0], x[-1])
     plt.ylim(y[0], y[-1])
     plt.subplots_adjust(left=0, right=1, bottom=0, top=1)
-    if hasattr(p,"plot_colorbar"):
-        plt.colorbar(shrink=0.8,location='top',pad = 0.01)
+    if hasattr(p, "plot_colorbar"):
+        plt.colorbar(shrink=0.8, location="top", pad=0.01)
     plt.savefig(p.folderName + "nu_" + str(t).zfill(6) + ".png")
 
 
@@ -282,8 +282,8 @@ def plot_relative_nu(x, y, s, p, t):
     plt.xlim(x[0], x[-1])
     plt.ylim(y[0], y[-1])
     plt.subplots_adjust(left=0, right=1, bottom=0, top=1)
-    if hasattr(p,"plot_colorbar"):
-        plt.colorbar(shrink=0.8,location='top',pad = 0.01)#,ticks = ticks)
+    if hasattr(p, "plot_colorbar"):
+        plt.colorbar(shrink=0.8, location="top", pad=0.01)  # ,ticks = ticks)
     plt.savefig(p.folderName + "rel_nu_" + str(t).zfill(6) + ".png")
 
 
@@ -338,8 +338,8 @@ def plot_u(x, y, s, u, v, p, t):
     plt.xlim(x[0], x[-1])
     plt.ylim(y[0], y[-1])
     plt.subplots_adjust(left=0, right=1, bottom=0, top=1)
-    if hasattr(p,"plot_colorbar"):
-        plt.colorbar(shrink=0.8, location='top', pad = 0.01)#,ticks = ticks)
+    if hasattr(p, "plot_colorbar"):
+        plt.colorbar(shrink=0.8, location="top", pad=0.01)  # ,ticks = ticks)
     plt.savefig(p.folderName + "U_mag_" + str(t).zfill(6) + ".png")
 
 

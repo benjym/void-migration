@@ -61,14 +61,10 @@ def IC(p):
                         remaining, size=int(p.nm * (1 - p.large_concentration) * p.nu_fill), replace=False
                     )
                     s[i, j, small] = p.s_m
-<<<<<<< HEAD
-            pre_masked = True
-=======
-                    if hasattr(p,"charge_discharge"):
-                        pre_masked = False
-                    else:
-                        pre_masked = True
->>>>>>> 811c1afe5ef8b42a76d8a04cd47832070bb286e5
+            if hasattr(p, "charge_discharge"):
+                pre_masked = False
+            else:
+                pre_masked = True
     elif p.gsd_mode == "poly":  # polydisperse
         # s_0 = p.s_m / (1.0 - p.s_m)  # intermediate calculation
         s_non_dim = np.random.rand(p.nm)
@@ -101,7 +97,6 @@ def IC(p):
             ] = True  # top row can't be filled for algorithmic reasons - could solve this if we need to
         elif p.IC_mode == "empty":  # completely empty
             mask = np.ones([p.nx, p.ny, p.nm], dtype=bool)
-            
 
         s[mask] = np.nan
 
@@ -429,44 +424,57 @@ def add_voids(u, v, s, p, c, outlet):
 
             x_points = np.arange(p.nx // 2 - p.half_width, p.nx // 2 + p.half_width + 1)
 
-            req = np.random.choice([p.s_m, p.s_M], size=[(p.nx // 2 + p.half_width + 1) - (p.nx // 2 - p.half_width), p.nm])  #create an array of grainsizes
-            mask = np.random.rand((p.nx // 2 + p.half_width + 1) - (p.nx // 2 - p.half_width), p.nm) > p.fill_ratio      #create how much to fill
-            req[mask] = np.nan                                                                                       #convert some cells to np.nan 
+            req = np.random.choice(
+                [p.s_m, p.s_M], size=[(p.nx // 2 + p.half_width + 1) - (p.nx // 2 - p.half_width), p.nm]
+            )  # create an array of grainsizes
+            mask = (
+                np.random.rand((p.nx // 2 + p.half_width + 1) - (p.nx // 2 - p.half_width), p.nm)
+                > p.fill_ratio
+            )  # create how much to fill
+            req[mask] = np.nan  # convert some cells to np.nan
 
         if p.gsd_mode == "mono":
 
             x_points = np.arange(p.nx // 2 - p.half_width, p.nx // 2 + p.half_width + 1)
-            req = p.s_m * np.ones([(p.nx // 2 + p.half_width + 1) - (p.nx // 2 - p.half_width), p.nm])  # monodisperse
+            req = p.s_m * np.ones(
+                [(p.nx // 2 + p.half_width + 1) - (p.nx // 2 - p.half_width), p.nm]
+            )  # monodisperse
 
             p.s_M = p.s_m
-            mask = np.random.rand((p.nx // 2 + p.half_width + 1) - (p.nx // 2 - p.half_width), p.nm) > p.fill_ratio
+            mask = (
+                np.random.rand((p.nx // 2 + p.half_width + 1) - (p.nx // 2 - p.half_width), p.nm)
+                > p.fill_ratio
+            )
 
             req[mask] = np.nan
- 
+
         den = 1 - np.mean(np.isnan(s), axis=2)
 
         if np.mean(den) == 0.0:
 
             for i in range(len(x_points)):
-                
+
                 for k in range(p.nm):
 
-                    s[x_points[i],0,k] = req[i,k]
+                    s[x_points[i], 0, k] = req[i, k]
         else:
 
             for i in range(len(x_points)):
-                
+
                 for k in range(p.nm):
 
-                    if np.isnan(s[x_points[i],0,k]) and np.count_nonzero(np.isnan(s[x_points[i],:,k])) == p.ny:
-                        s[x_points[i],0,k] = req[i,k]
+                    if (
+                        np.isnan(s[x_points[i], 0, k])
+                        and np.count_nonzero(np.isnan(s[x_points[i], :, k])) == p.ny
+                    ):
+                        s[x_points[i], 0, k] = req[i, k]
                     else:
-                        a = np.max(np.argwhere(~np.isnan(s[x_points[i],:,k])))   #####choose the max ht
+                        a = np.max(np.argwhere(~np.isnan(s[x_points[i], :, k])))  #####choose the max ht
                         # print(a)
                         if a >= p.ny - 2:
                             pass
                         else:
-                            s[x_points[i],a+1,k] = req[i,k]                          #####place a cell on the topmost cell "a+1"
+                            s[x_points[i], a + 1, k] = req[i, k]  #####place a cell on the topmost cell "a+1"
 
     return u, v, s, c, outlet
 
@@ -502,20 +510,20 @@ def close_voids(u, v, s):
     return u, v, s
 
 
-def charge_discharge(p,op_arr,t,change_s_ms):
+def charge_discharge(p, op_arr, t, change_s_ms):
 
-    '''
+    """
     As of now two times (t_fill and t_empty) are calculated and t_settle is given
     t_fill - filling time
     t_settle - allow the cells to settle
     t_empty - end time
-    for mono-disperse conditions, increase very slightly the grainsize for different cycles 
-    (mainly to assign different colors for different cycle), and 
-    this is done in the time_march function 
-    '''
-    
+    for mono-disperse conditions, increase very slightly the grainsize for different cycles
+    (mainly to assign different colors for different cycle), and
+    this is done in the time_march function
+    """
+
     s_ms = 0
-    if p.gsd_mode == 'mono':
+    if p.gsd_mode == "mono":
 
         colsm = []
         for i in range(p.no_of_cycles):
@@ -524,59 +532,60 @@ def charge_discharge(p,op_arr,t,change_s_ms):
             else:
                 colsm.append(change_s_ms[1])
 
-    res = [sub['t_empty'] for sub in op_arr]  #Just take the t_empty values from the op_arr dictionary
-    
+    res = [sub["t_empty"] for sub in op_arr]  # Just take the t_empty values from the op_arr dictionary
+
     yj = []
     for j in range(len(res)):
-        if t < int(np.ceil(res[j]/p.dt)):    
+        if t < int(np.ceil(res[j] / p.dt)):
             yj.append(op_arr[j])
-    
-    if p.gsd_mode == 'mono':
+
+    if p.gsd_mode == "mono":
         col_index = colsm[int(len(op_arr) - len(yj))]
 
-
-    if t <= int(np.ceil(yj[0].get('t_fill')/p.dt)):   ##To always pick the time belonging to the first element in the array 
-        if p.gsd_mode == 'mono':
+    if t <= int(
+        np.ceil(yj[0].get("t_fill") / p.dt)
+    ):  ##To always pick the time belonging to the first element in the array
+        if p.gsd_mode == "mono":
             p.s_m = col_index
             p.s_M = p.s_m
-            p.add_voids = 'place_on_top' #'pour_base'
+            p.add_voids = "place_on_top"  #'pour_base'
         else:
-            p.add_voids = 'place_on_top'
+            p.add_voids = "place_on_top"
 
-    elif int(np.ceil(yj[0].get('t_fill')/p.dt)) < t <= int(np.ceil(yj[0].get('t_settle')/p.dt)):
-        p.add_voids = 'None'
+    elif int(np.ceil(yj[0].get("t_fill") / p.dt)) < t <= int(np.ceil(yj[0].get("t_settle") / p.dt)):
+        p.add_voids = "None"
 
-    elif int(np.ceil(yj[0].get('t_settle')/p.dt)) < t < int(np.ceil(yj[0].get('t_empty')/p.dt)-1):
+    elif int(np.ceil(yj[0].get("t_settle") / p.dt)) < t < int(np.ceil(yj[0].get("t_empty") / p.dt) - 1):
         p.add_voids = "central_outlet"
         p.save_outlet = True
 
-    return p,change_s_ms
+    return p, change_s_ms
 
 
 def cals_in_cd(p):
-    '''
+    """
     Calculates the time required for filling, settling and emptying for each cycle and a desired number of cycles
     M_total : Total mass for a given solid fraction
     Mass_in_per_u_t : Mass going in per unit time
-    Mass_out_per_u_t : Mass coming out of silo per unit time 
+    Mass_out_per_u_t : Mass coming out of silo per unit time
     T_in : filling time calculated based on M_total, Mass_in_per_u_t and p.dt
-    T_settle : settling time 
+    T_settle : settling time
     T_out : emptying time calculated based on M_in, Mass_out_per_u_t and p.dt
-    op_arr : holds the values for t_fill, t_settle and t_empty for each cycle and for a desired number of cycles  
+    op_arr : holds the values for t_fill, t_settle and t_empty for each cycle and for a desired number of cycles
 
-    '''
-    if hasattr(p,"give_mass"):
+    """
+    if hasattr(p, "give_mass"):
 
         M_of_each_cell = p.dy * p.dy * p.rho_p / p.nm
 
-        # Total mass = no. of non-nan cells * Mass of each cell 
+        # Total mass = no. of non-nan cells * Mass of each cell
         M_total = p.nx * p.ny * p.nm * M_of_each_cell * p.nu_cs
 
-        free_par = 0.17             ## do not know why this. How to decide this?
+        free_par = 0.17  ## do not know why this. How to decide this?
 
         # Mass per unit time
-        Mass_in_per_u_t = (p.half_width * 2 + 1) * p.nm * p.fill_ratio * M_of_each_cell 
-        Mass_out_per_u_t = (p.half_width * 2 + 1) * p.nm * p.free_par * M_of_each_cell 
+        Mass_in_per_u_t = (p.half_width * 2 + 1) * p.nm * p.fill_ratio * M_of_each_cell
+        Mass_out_per_u_t = (p.half_width * 2 + 1) * p.nm * p.free_par * M_of_each_cell
 
         # Mass in
         Mass_in = M_total * np.array(list(p.M_ins.values()))
@@ -584,17 +593,25 @@ def cals_in_cd(p):
         # Mass out
         Mass_out = Mass_in * np.array(list(p.M_empty.values()))
 
-        # Time in 
-        T_in = [int((Mass_in[0]/Mass_in_per_u_t)*p.dt),int((Mass_in[1]/Mass_in_per_u_t)*p.dt),int((Mass_in[2]/Mass_in_per_u_t)*p.dt)]
+        # Time in
+        T_in = [
+            int((Mass_in[0] / Mass_in_per_u_t) * p.dt),
+            int((Mass_in[1] / Mass_in_per_u_t) * p.dt),
+            int((Mass_in[2] / Mass_in_per_u_t) * p.dt),
+        ]
 
-        # Time settle 
+        # Time settle
         T_settle = np.array(list(p.T_settle.values()))
 
         # Time out
-        T_out = [int((Mass_out[0]/Mass_out_per_u_t)*p.dt), int((Mass_out[1]/Mass_out_per_u_t)*p.dt), int((Mass_out[2]/Mass_out_per_u_t)*p.dt)]
+        T_out = [
+            int((Mass_out[0] / Mass_out_per_u_t) * p.dt),
+            int((Mass_out[1] / Mass_out_per_u_t) * p.dt),
+            int((Mass_out[2] / Mass_out_per_u_t) * p.dt),
+        ]
 
         tmp = 0
-    
+
         for i in range(p.no_of_cycles):
 
             T_in[i] = T_in[i] + tmp
@@ -602,7 +619,7 @@ def cals_in_cd(p):
             T_out[i] = T_out[i] + T_settle[i]
             tmp = T_out[i]
 
-    if hasattr(p,"give_time") and hasattr(p, "T_in") and hasattr(p, "T_settle") and hasattr(p, "T_empty"):
+    if hasattr(p, "give_time") and hasattr(p, "T_in") and hasattr(p, "T_settle") and hasattr(p, "T_empty"):
         T_in = list(p.T_in.values())
         T_settle = list(p.T_settle.values())
         T_out = list(p.T_empty.values())
@@ -613,38 +630,41 @@ def cals_in_cd(p):
             T_settle[i] = T_settle[i] + T_in[i]
             T_out[i] = T_out[i] + T_settle[i]
             tmp = T_out[i]
-        
-    all_Ts = np.transpose([T_in,T_settle,T_out])   ## to arange the times in a cycle fashion
 
+    all_Ts = np.transpose([T_in, T_settle, T_out])  ## to arange the times in a cycle fashion
 
     # Initialize dictionary
-    times = ["t_fill","t_settle","t_empty"]
+    times = ["t_fill", "t_settle", "t_empty"]
     op_arr = []
     for i in range(p.no_of_cycles):
-        op_arr.append({x: {} for x in times})    ## creating empty dictionary with empty times
+        op_arr.append({x: {} for x in times})  ## creating empty dictionary with empty times
 
     for j in range(p.no_of_cycles):
-        op_arr[j] = {key: all_Ts[j][i] for i, key in enumerate(op_arr[j])}   ##assigned the values for times t_fill t_settle and t_empty
+        op_arr[j] = {
+            key: all_Ts[j][i] for i, key in enumerate(op_arr[j])
+        }  ##assigned the values for times t_fill t_settle and t_empty
 
     return op_arr
 
-def save_quantities(p,s):
-    p_count = 0 
+
+def save_quantities(p, s):
+    p_count = 0
     p_count_s = 0
-    p_count_l = 0 
+    p_count_l = 0
     non_zero_nu_time = 0
 
-    if p.gsd_mode == 'mono':
+    if p.gsd_mode == "mono":
         p_count = np.count_nonzero(s[~np.isnan(s)])
-    elif p.gsd_mode == 'bi':
+    elif p.gsd_mode == "bi":
         p_count_s = np.count_nonzero(s[~np.isnan(s)] == p.s_m)
         p_count_l = np.count_nonzero(s[~np.isnan(s)] == p.s_M)
 
-    non_zero_avg_nu = 1 - np.mean(np.isnan(s), axis=2)          ##get the solid fraction
-    non_zero_nu_time = np.mean(non_zero_avg_nu[np.nonzero(non_zero_avg_nu)])  ##get the avg solid fraction ignoring the zeros
+    non_zero_avg_nu = 1 - np.mean(np.isnan(s), axis=2)  ##get the solid fraction
+    non_zero_nu_time = np.mean(
+        non_zero_avg_nu[np.nonzero(non_zero_avg_nu)]
+    )  ##get the avg solid fraction ignoring the zeros
 
     return p_count, p_count_s, p_count_l, non_zero_nu_time
-
 
 
 def time_march(p):
@@ -663,35 +683,19 @@ def time_march(p):
     t = 0
 
     p.t_p = p.s_m / np.sqrt(p.g * p.H)  # smallest confinement timescale (at bottom) (s)
-<<<<<<< HEAD
     p.free_fall_velocity = np.sqrt(p.g * (p.s_m + p.s_M) / 2.0)  # time to fall one mean diameter (s)
-=======
-    p.free_fall_velocity = np.sqrt(p.g * p.dy)  # time to fall one cell (s)
 
-    # Define reference probabilities
-    # p.P_u_ref = 1.0 / (1.0 + 1.0 / p.beta) * (p.s_m / p.s_M)
-    # p.P_lr_ref = p.P_u_ref / (2 * p.beta)
-    # p.dt = p.P_u_ref * p.dy / p.free_fall_velocity
-    s_ms = [0,0]
-    change_s_ms = [p.s_m,p.s_m + p.s_m/1000]
->>>>>>> 811c1afe5ef8b42a76d8a04cd47832070bb286e5
+    s_ms = [0, 0]
+    change_s_ms = [p.s_m, p.s_m + p.s_m / 1000]
 
     safe = False
     stability = 0.5
     while not safe:
         p.P_u_ref = stability
         p.dt = p.P_u_ref * p.dy / p.free_fall_velocity
-<<<<<<< HEAD
+
         p.P_lr_ref = p.alpha * p.P_u_ref
 
-=======
-
-        # p.P_lr_ref = p.beta * p.dt / p.dy / p.dy # NOTE: p.beta HAS UNITS OF VELOCITY!!
-        p.P_lr_ref = p.P_u_ref / (
-            2 * p.beta
-        )  # * p.free_fall_velocity * p.dt / p.dy / p.dy  # NOTE: BETA IS DIMENSIONLESS
-        
->>>>>>> 811c1afe5ef8b42a76d8a04cd47832070bb286e5
         p.P_u_max = p.P_u_ref * (p.s_M / p.s_m)
         p.P_lr_max = p.P_lr_ref * (p.s_M / p.s_m)
 
@@ -700,18 +704,24 @@ def time_march(p):
         else:
             stability *= 0.95
 
-    if hasattr(p,"charge_discharge"):
-        if (hasattr(p,"give_mass")) or (hasattr(p,"give_time") and hasattr(p, "T_in") and hasattr(p, "T_settle") and hasattr(p, "T_empty")):
-            op_arr = cals_in_cd(p)      ## get the time cycles
-        
+    if hasattr(p, "charge_discharge"):
+        if (hasattr(p, "give_mass")) or (
+            hasattr(p, "give_time")
+            and hasattr(p, "T_in")
+            and hasattr(p, "T_settle")
+            and hasattr(p, "T_empty")
+        ):
+            op_arr = cals_in_cd(p)  ## get the time cycles
+
         else:
             op_arr = p.T_cycles
 
-        p.nt = int(np.ceil(op_arr[-1].get('t_empty') / p.dt))     ## cal the number of steps based on final t_empty
+        p.nt = int(
+            np.ceil(op_arr[-1].get("t_empty") / p.dt)
+        )  ## cal the number of steps based on final t_empty
 
     else:
         p.nt = int(np.ceil(p.t_f / p.dt))
-
 
     s = IC(p)  # non-dimensional size
     u = np.zeros([p.nx, p.ny])
@@ -720,7 +730,6 @@ def time_march(p):
     p_count_s = np.zeros([p.nt])
     p_count_l = np.zeros([p.nt])
     non_zero_nu_time = np.zeros([p.nt])
-
 
     if hasattr(p, "concentration"):
         c = np.zeros_like(s)  # original bin that particles started in
@@ -750,18 +759,11 @@ def time_march(p):
     else:
         T = None
 
-    plotter.save_coordinate_system(x, y, p)
-<<<<<<< HEAD
-    plotter.update(x, y, s, u, v, c, T, p, t)
-=======
-
-    plotter.make_saves(x, y, s, u, v, c, T, p, t, s_ms)
-
->>>>>>> 811c1afe5ef8b42a76d8a04cd47832070bb286e5
     outlet = []
+    plotter.save_coordinate_system(x, y, p)
+    plotter.update(x, y, s, u, v, c, T, outlet, p, t)
 
     N_swap = None
-
     params.indices = np.arange(p.nx * (p.ny - 1) * p.nm)
     np.random.shuffle(params.indices)
 
@@ -773,9 +775,9 @@ def time_march(p):
         if hasattr(p, "temperature"):
             T = thermal.update_temperature(s, T, p)
 
-        if hasattr(p,"charge_discharge"):
-            p,s_ms = charge_discharge(p,op_arr,t,change_s_ms)
-            p_count[t],p_count_s[t],p_count_l[t],non_zero_nu_time[t] = save_quantities(p,s)
+        if hasattr(p, "charge_discharge"):
+            p, s_ms = charge_discharge(p, op_arr, t, change_s_ms)
+            p_count[t], p_count_s[t], p_count_l[t], non_zero_nu_time[t] = save_quantities(p, s)
 
         u, v, s, c, T, N_swap = move_voids(u, v, s, p, c=c, T=T, N_swap=N_swap)
 
@@ -785,8 +787,7 @@ def time_march(p):
             u, v, s = close_voids(u, v, s)
 
         if t % p.save_inc == 0:
-<<<<<<< HEAD
-            plotter.update(x, y, s, u, v, c, T, p, t)
+            plotter.update(x, y, s, u, v, c, T, outlet, p, t)
 
         t += 1
 
@@ -809,21 +810,6 @@ def run_simulation(sim_with_index):
     time_march(p)
     plotter.make_video(p)
     return folderName
-=======
-            plotter.make_saves(x, y, s, u, v, c, T, p, t, s_ms)
-
-        # s_bar_time[t] = s_bar  # save average size
-        # u_time[t] = np.mean(u, axis=0)
-        # nu_time[t] = np.mean(1 - np.mean(np.isnan(s), axis=2), axis=0)
-        # nu_time_x[t] = np.mean(1 - np.mean(np.isnan(s), axis=2), axis=1)
-
-        t += 1
-    if hasattr(p,"charge_discharge"):
-        plotter.c_d_saves(p, non_zero_nu_time, p_count, p_count_s, p_count_l)
-
-    plotter.make_saves(x, y, s, u, v, c, T, p, t, s_ms)
-    
->>>>>>> 811c1afe5ef8b42a76d8a04cd47832070bb286e5
 
 
 if __name__ == "__main__":
