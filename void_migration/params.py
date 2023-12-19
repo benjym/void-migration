@@ -32,8 +32,6 @@ class dict_to_class:
             os.makedirs(self.folderName)
         if hasattr(self, "aspect_ratio"):
             self.ny = int(self.nx * self.aspect_ratio)
-        if hasattr(self, "give_time"):
-            self.T_cycles = self.T_cycles
 
         if self.gsd_mode == "mono":
             if hasattr(self, "s_m") and hasattr(self, "s_M"):
