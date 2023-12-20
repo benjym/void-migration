@@ -3,7 +3,7 @@ import numpy as np
 op_arr = []
 
 
-def charge_discharge(p, op_arr, t, change_s_ms):
+def charge_discharge(p, t):
     """
     As of now two times (t_fill and t_empty) are calculated and t_settle is given
     t_fill - filling time
@@ -18,9 +18,9 @@ def charge_discharge(p, op_arr, t, change_s_ms):
         colsm = []
         for i in range(p.no_of_cycles):
             if i % 2 == 0:
-                colsm.append(change_s_ms[0])
+                colsm.append(p.s_m)
             else:
-                colsm.append(change_s_ms[1])
+                colsm.append(p.s_m * 1.00000000001)
 
     res = [sub["t_empty"] for sub in op_arr]  # Just take the t_empty values from the op_arr dictionary
 
@@ -49,7 +49,7 @@ def charge_discharge(p, op_arr, t, change_s_ms):
         p.add_voids = "central_outlet"
         p.save_outlet = True
 
-    return p, change_s_ms
+    return p
 
 
 def cals_in_cd(p):

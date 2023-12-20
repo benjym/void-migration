@@ -106,7 +106,7 @@ def time_march(p):
             T = thermal.update_temperature(s, T, p)
 
         if hasattr(p, "charge_discharge"):
-            p, s_ms = cycles.charge_discharge(p, t, change_s_ms)
+            p = cycles.charge_discharge(p, t)
             p_count[t], p_count_s[t], p_count_l[t], non_zero_nu_time[t] = cycles.save_quantities(p, s)
 
         u, v, s, c, T, N_swap = motion.move_voids(u, v, s, p, c=c, T=T, N_swap=N_swap)

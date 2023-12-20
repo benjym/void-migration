@@ -22,6 +22,9 @@ _video_encoding = [
     "22",
 ]  # powerpoint compatible
 
+_dpi = 100
+plt.rcParams["figure.dpi"] = _dpi
+
 
 def is_ffmpeg_installed():
     try:
@@ -73,8 +76,7 @@ def set_plot_size(p):
     for i in plt.get_fignums():
         plt.close(i)
 
-    dpi = 20
-    fig = plt.figure(figsize=[p.nx / dpi, p.ny / dpi])
+    fig = plt.figure(figsize=[p.nx / _dpi, p.ny / _dpi])
     summary_fig = plt.figure()
 
 
@@ -208,7 +210,7 @@ def plot_permeability(x, y, s, p, t):
     plt.xlim(x[0], x[-1])
     plt.ylim(y[0], y[-1])
     plt.subplots_adjust(left=0, right=1, bottom=0, top=1)
-    plt.savefig(p.folderName + "permeability_" + str(t).zfill(6) + ".png", dpi=100)
+    plt.savefig(p.folderName + "permeability_" + str(t).zfill(6) + ".png")
 
 
 def save_permeability(x, y, s, p, t):
@@ -324,7 +326,7 @@ def plot_u(x, y, s, u, v, p, t):
     plt.ylim(y[0], y[-1])
     plt.subplots_adjust(left=0.0, right=1.0, bottom=0.0, top=1.0)
     # plt.colorbar()
-    plt.savefig(p.folderName + "u_" + str(t).zfill(6) + ".png", dpi=100)
+    plt.savefig(p.folderName + "u_" + str(t).zfill(6) + ".png")
 
     plt.clf()
     # plt.quiver(X,Y,u,v)
@@ -337,7 +339,7 @@ def plot_u(x, y, s, u, v, p, t):
     plt.xlim(x[0], x[-1])
     plt.ylim(y[0], y[-1])
     plt.subplots_adjust(left=0, right=1, bottom=0, top=1)
-    plt.savefig(p.folderName + "v_" + str(t).zfill(6) + ".png", dpi=100)
+    plt.savefig(p.folderName + "v_" + str(t).zfill(6) + ".png")
 
     U = np.sqrt(u**2 + v**2)
     plt.clf()
@@ -371,7 +373,7 @@ def plot_c(x, y, s, c, folderName, t, internal_geometry):
     plt.xlim(x[0], x[-1])
     plt.ylim(y[0], y[-1])
     plt.subplots_adjust(left=0, right=1, bottom=0, top=1)
-    plt.savefig(folderName + "c_" + str(t).zfill(6) + ".png", dpi=100)
+    plt.savefig(folderName + "c_" + str(t).zfill(6) + ".png")
 
 
 def save_c(c, folderName, t):
@@ -387,7 +389,7 @@ def plot_outlet(outlet, folderName):
     plt.ylabel("outflow")
     plt.subplots_adjust(left=0.1, right=0.9, bottom=0.1, top=0.9)
 
-    plt.savefig(folderName + "outflow.png", dpi=100)
+    plt.savefig(folderName + "outflow.png")
 
 
 def plot_profile(x, nu_time_x, p):
@@ -399,7 +401,7 @@ def plot_profile(x, nu_time_x, p):
     plt.ylabel("t")
     plt.subplots_adjust(left=0.1, right=0.9, bottom=0.1, top=0.9)
 
-    plt.savefig(p.folderName + "collapse_profile.png", dpi=100)
+    plt.savefig(p.folderName + "collapse_profile.png")
 
 
 def plot_T(x, y, s, T, p, t):
@@ -420,7 +422,7 @@ def plot_T(x, y, s, T, p, t):
     plt.xlim(x[0], x[-1])
     plt.ylim(y[0], y[-1])
     plt.subplots_adjust(left=0, right=1, bottom=0, top=1)
-    plt.savefig(p.folderName + "T_" + str(t).zfill(6) + ".png", dpi=100)
+    plt.savefig(p.folderName + "T_" + str(t).zfill(6) + ".png")
 
 
 def make_video(p):
