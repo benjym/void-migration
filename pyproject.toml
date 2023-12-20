@@ -21,6 +21,7 @@ dependencies = [
     "mkdocstrings[python]",
     "mkdocs-material",
     "markdown-include",
+    "mkdocs-include-markdown-plugin",
     "pre-commit",
 ]
 
