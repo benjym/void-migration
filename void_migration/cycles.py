@@ -4,7 +4,6 @@ op_arr = []
 
 
 def charge_discharge(p, op_arr, t, change_s_ms):
-
     """
     As of now two times (t_fill and t_empty) are calculated and t_settle is given
     t_fill - filling time
@@ -16,7 +15,6 @@ def charge_discharge(p, op_arr, t, change_s_ms):
     """
 
     if p.gsd_mode == "mono":
-
         colsm = []
         for i in range(p.no_of_cycles):
             if i % 2 == 0:
@@ -67,7 +65,6 @@ def cals_in_cd(p):
 
     """
     if hasattr(p, "give_mass"):
-
         M_of_each_cell = p.dy * p.dy * p.rho_p / p.nm
 
         # Total mass = no. of non-nan cells * Mass of each cell
@@ -103,7 +100,6 @@ def cals_in_cd(p):
         tmp = 0
 
         for i in range(p.no_of_cycles):
-
             T_in[i] = T_in[i] + tmp
             T_settle[i] = T_settle[i] + T_in[i]
             T_out[i] = T_out[i] + T_settle[i]
@@ -115,7 +111,6 @@ def cals_in_cd(p):
         T_out = list(p.T_empty.values())
         tmp = 0
         for i in range(p.no_of_cycles):
-
             T_in[i] = T_in[i] + tmp
             T_settle[i] = T_settle[i] + T_in[i]
             T_out[i] = T_out[i] + T_settle[i]
@@ -125,7 +120,7 @@ def cals_in_cd(p):
 
     # Initialize dictionary
     times = ["t_fill", "t_settle", "t_empty"]
-    
+
     for i in range(p.no_of_cycles):
         op_arr.append({x: {} for x in times})  # creating empty dictionary with empty times
 
@@ -159,16 +154,11 @@ def save_quantities(p, s):
 
 def set_nt(p):
     if (hasattr(p, "give_mass")) or (
-        hasattr(p, "give_time")
-        and hasattr(p, "T_in")
-        and hasattr(p, "T_settle")
-        and hasattr(p, "T_empty")
+        hasattr(p, "give_time") and hasattr(p, "T_in") and hasattr(p, "T_settle") and hasattr(p, "T_empty")
     ):
         op_arr = cals_in_cd(p)  # get the time cycles
 
     else:
         op_arr = p.T_cycles
 
-    return int(
-        np.ceil(op_arr[-1].get("t_empty") / p.dt)
-    )  # cal the number of steps based on final t_empty
+    return int(np.ceil(op_arr[-1].get("t_empty") / p.dt))  # cal the number of steps based on final t_empty
