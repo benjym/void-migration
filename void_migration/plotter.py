@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 from matplotlib.colors import LinearSegmentedColormap
 import matplotlib.cm as cm
 import warnings
-from operators import get_average, get_solid_fraction
+import operators
 
 # _video_encoding = ["-c:v", "libx265", "-preset", "fast", "-crf", "28", "-tag:v", "hvc1"] # nice small file sizes
 _video_encoding = [
@@ -31,7 +31,6 @@ def is_ffmpeg_installed():
         return False
 
 
-plt.inferno()
 cdict = {
     "red": ((0.0, 1.0, 1.0), (0.25, 1.0, 1.0), (0.5, 1.0, 1.0), (0.75, 0.902, 0.902), (1.0, 0.0, 0.0)),
     "green": (
@@ -59,7 +58,10 @@ bwr.set_bad("k", 1.0)
 colors = [(1, 0, 0), (0, 0, 1)]
 cmap_name = "my_list"
 cmap = LinearSegmentedColormap.from_list(cmap_name, colors, N=2)
-
+inferno = cm.get_cmap("inferno")
+inferno.set_bad("w", 0.0)
+inferno_r = cm.get_cmap("inferno_r")
+inferno_r.set_bad("w", 0.0)
 
 global fig, summary_fig
 
@@ -92,8 +94,8 @@ def update(x, y, s, u, v, c, T, outlet, p, t, *args):
         plot_c(x, y, s, c, p.folderName, t, p.internal_geometry)
     if "temperature" in p.plot:
         plot_T(x, y, s, T, p, t)
-    if "density_profile" in p.plot:
-        plot_profile(x, nu_time_x, p)
+    # if "density_profile" in p.plot:
+    #     plot_profile(x, nu_time_x, p)
     if "permeability" in p.plot:
         plot_permeability(x, y, s, p, t)
 
@@ -103,14 +105,16 @@ def update(x, y, s, u, v, c, T, outlet, p, t, *args):
         save_nu(x, y, s, p, t)
     if "rel_nu" in p.save:
         save_relative_nu(x, y, s, p, t)
-    if "U_mag" in p.save:
-        save_u(x, y, s, u, v, p, t)
+    # if "U_mag" in p.save:
+    #     save_u(x, y, s, u, v, p, t)
+    if "permeability" in p.save:
+        save_permeability(x, y, s, p, t)
     if "concentration" in p.save:
         save_c(c, p.folderName, t)
     if "outlet" in p.save:
         np.savetxt(p.folderName + "outlet.csv", np.array(outlet), delimiter=",")
-    if "temperature" in p.save:
-        np.savetxt(p.folderName + "outlet_T.csv", np.array(outlet_T), delimiter=",")
+    # if "temperature" in p.save:
+    #     np.savetxt(p.folderName + "outlet_T.csv", np.array(outlet_T), delimiter=",")
     if "velocity" in p.save:
         np.savetxt(p.folderName + "u.csv", u / np.sum(np.isnan(s), axis=2), delimiter=",")
     if "charge_discharge" in p.save:
@@ -160,7 +164,7 @@ def plot_s_bar(y, s_bar, nu_time, p):
     np.save(p.folderName + "s_bar.npy", s_bar.T)
 
     plt.clf()
-    plt.pcolormesh(np.linspace(0, p.t_f, p.nt), y, nu_time.T, cmap="inferno", vmin=0, vmax=1)
+    plt.pcolormesh(np.linspace(0, p.t_f, p.nt), y, nu_time.T, cmap=inferno, vmin=0, vmax=1)
     plt.xlabel("Time (s)")
     plt.ylabel("Height (m)")
     plt.colorbar()
@@ -181,20 +185,25 @@ def c_d_saves(p, non_zero_nu_time, *args):
         np.save(p.folderName + "cell_count_l.npy", args[1])
 
 
-def plot_permeability(x, y, s, p, t):
-    """
-    Calculate and save the permeability of the domain at time t.
-    """
+def kozeny_carman(s):
     sphericity = 1
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", category=RuntimeWarning)
         porosity = np.mean(np.isnan(s), axis=2)
-        s_bar = get_average(s)
+        s_bar = operators.get_average(s)
         permeability = sphericity**2 * (porosity**3) * s_bar**2 / (180 * (1 - porosity) ** 2)
+    return permeability
+
+
+def plot_permeability(x, y, s, p, t):
+    """
+    Calculate and save the permeability of the domain at time t.
+    """
+    permeability = kozeny_carman(s)
 
     plt.figure(fig)
     plt.clf()
-    plt.pcolormesh(x, y, permeability.T, cmap="inferno")
+    plt.pcolormesh(x, y, permeability.T, cmap=inferno)
     plt.axis("off")
     plt.xlim(x[0], x[-1])
     plt.ylim(y[0], y[-1])
@@ -203,6 +212,7 @@ def plot_permeability(x, y, s, p, t):
 
 
 def save_permeability(x, y, s, p, t):
+    permeability = kozeny_carman(s)
     np.savetxt(p.folderName + "permeability_" + str(t).zfill(6) + ".csv", permeability, delimiter=",")
 
 
@@ -234,16 +244,18 @@ def plot_s(x, y, s, p, t, *args):
 
 
 def save_s(x, y, s, p, t):
-    np.save(p.folderName + "s_" + str(t).zfill(6) + ".npy", get_average(s))
+    np.save(p.folderName + "s_" + str(t).zfill(6) + ".npy", operators.get_average(s))
 
 
 def plot_nu(x, y, s, p, t):
     plt.figure(fig)
     nu = 1 - np.mean(np.isnan(s), axis=2).T
+    nu = np.ma.masked_where(nu == 0, nu)
     if p.internal_geometry:
         nu = np.ma.masked_where(p.boundary.T, nu)
     plt.clf()
-    plt.pcolormesh(x, y, nu, cmap="inferno_r", vmin=0, vmax=1)
+
+    plt.pcolormesh(x, y, nu, cmap=inferno_r, vmin=0, vmax=1)
     if p.internal_geometry:
         if p.internal_geometry["perf_plate"]:
             for i in p.internal_geometry["perf_pts"]:
@@ -258,11 +270,11 @@ def plot_nu(x, y, s, p, t):
 
 
 def save_nu(x, y, s, p, t):
-    np.save(p.folderName + "nu_" + str(t).zfill(6) + ".npy", get_solid_fraction(s))
+    np.save(p.folderName + "nu_" + str(t).zfill(6) + ".npy", operators.get_solid_fraction(s))
 
 
 def save_relative_nu(x, y, s, p, t):
-    np.save(p.folderName + "nu_" + str(t).zfill(6) + ".npy", get_solid_fraction(s) / p.nu_cs)
+    np.save(p.folderName + "nu_" + str(t).zfill(6) + ".npy", operators.get_solid_fraction(s) / p.nu_cs)
 
 
 def plot_relative_nu(x, y, s, p, t):
@@ -329,7 +341,7 @@ def plot_u(x, y, s, u, v, p, t):
 
     U = np.sqrt(u**2 + v**2)
     plt.clf()
-    plt.pcolormesh(x, y, np.ma.masked_where(p.boundary.T, U), vmin=0, vmax=np.amax(np.abs(U)), cmap="inferno")
+    plt.pcolormesh(x, y, np.ma.masked_where(p.boundary.T, U), vmin=0, vmax=np.amax(np.abs(U)), cmap=inferno)
     if p.internal_geometry:
         if p.internal_geometry["perf_plate"]:
             for i in p.internal_geometry["perf_pts"]:
@@ -350,7 +362,7 @@ def plot_c(x, y, s, c, folderName, t, internal_geometry):
     mask = np.sum(np.isnan(s), axis=2) > 0.95 * nm
 
     plt.clf()
-    plt.pcolormesh(x, y, np.ma.masked_where(mask, np.nanmean(c, axis=2)).T, cmap="inferno", vmin=0, vmax=2)
+    plt.pcolormesh(x, y, np.ma.masked_where(mask, np.nanmean(c, axis=2)).T, cmap=inferno, vmin=0, vmax=2)
     if internal_geometry:
         if internal_geometry["perf_plate"]:
             for i in internal_geometry["perf_pts"]:
