@@ -7,7 +7,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      - uses: psf/black@stable
+      - uses: psf/black@22.10.0
         with:
           options: "--check --verbose"
           src: "./void_migration"
