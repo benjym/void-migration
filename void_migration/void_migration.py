@@ -41,9 +41,6 @@ def time_march(p):
     p.t_p = p.s_m / np.sqrt(p.g * p.H)  # smallest confinement timescale (at bottom) (s)
     p.free_fall_velocity = np.sqrt(p.g * (p.s_m + p.s_M) / 2.0)  # time to fall one mean diameter (s)
 
-    s_ms = [0, 0]
-    change_s_ms = [p.s_m, p.s_m + p.s_m / 1000]
-
     safe = False
     stability = 0.5
     while not safe:
@@ -73,13 +70,7 @@ def time_march(p):
     p_count_l = np.zeros([p.nt])
     non_zero_nu_time = np.zeros([p.nt])
 
-    if hasattr(p, "concentration"):
-        c = np.zeros_like(s)  # original bin that particles started in
-        c[int(p.internal_geometry.perf_pts[0] * p.nx) : int(p.internal_geometry.perf_pts[1] * p.nx)] = 1
-        c[int(p.internal_geometry.perf_pts[1] * p.nx) :] = 2
-        c[np.isnan(s)] = np.nan
-    else:
-        c = None
+    c = initial.set_concentration(s, X, Y, p)
 
     initial.set_boundary(s, X, Y, p)
 

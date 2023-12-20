@@ -14,7 +14,7 @@ class dict_to_class:
         lists: List[List] = []
         for key in dict:
             setattr(self, key, dict[key])
-            if isinstance(dict[key], list) and key not in ["save", "plot", "videos"]:
+            if isinstance(dict[key], list) and key not in ["save", "plot", "videos", "T_cycles"]:
                 list_keys.append(key)
                 lists.append(dict[key])
         setattr(self, "lists", lists)

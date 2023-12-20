@@ -92,8 +92,8 @@ def update(x, y, s, u, v, c, T, outlet, p, t, *args):
         plot_relative_nu(x, y, s, p, t)
     if "U_mag" in p.plot:
         plot_u(x, y, s, u, v, p, t)
-    if "concentration" in p.plot:
-        plot_c(x, y, s, c, p.folderName, t, p.internal_geometry)
+    if "c" in p.plot:
+        plot_c(x, y, s, c, p, t)
     if "temperature" in p.plot:
         plot_T(x, y, s, T, p, t)
     # if "density_profile" in p.plot:
@@ -357,23 +357,25 @@ def plot_u(x, y, s, u, v, p, t):
     plt.savefig(p.folderName + "U_mag_" + str(t).zfill(6) + ".png")
 
 
-def plot_c(x, y, s, c, folderName, t, internal_geometry):
+def plot_c(x, y, s, c, p, t):
     plt.figure(fig)
 
     nm = s.shape[2]
     mask = np.sum(np.isnan(s), axis=2) > 0.95 * nm
 
     plt.clf()
-    plt.pcolormesh(x, y, np.ma.masked_where(mask, np.nanmean(c, axis=2)).T, cmap=inferno, vmin=0, vmax=2)
-    if internal_geometry:
-        if internal_geometry["perf_plate"]:
-            for i in internal_geometry["perf_pts"]:
+    plt.pcolormesh(
+        x, y, np.ma.masked_where(mask, np.nanmean(c, axis=2)).T, cmap=inferno, vmin=0, vmax=len(p.T_cycles)
+    )
+    if p.internal_geometry:
+        if p.internal_geometry["perf_plate"]:
+            for i in p.internal_geometry["perf_pts"]:
                 plt.plot([x[i], x[i]], [y[0], y[-1]], "k--", linewidth=10)
     plt.axis("off")
     plt.xlim(x[0], x[-1])
     plt.ylim(y[0], y[-1])
     plt.subplots_adjust(left=0, right=1, bottom=0, top=1)
-    plt.savefig(folderName + "c_" + str(t).zfill(6) + ".png")
+    plt.savefig(p.folderName + "c_" + str(t).zfill(6) + ".png")
 
 
 def save_c(c, folderName, t):

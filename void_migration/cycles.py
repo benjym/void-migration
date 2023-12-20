@@ -1,6 +1,7 @@
 import numpy as np
 
 op_arr = []
+s_ms = [0, 0]
 
 
 def charge_discharge(p, t):
@@ -48,6 +49,8 @@ def charge_discharge(p, t):
     elif int(np.ceil(yj[0].get("t_settle") / p.dt)) < t < int(np.ceil(yj[0].get("t_empty") / p.dt) - 1):
         p.add_voids = "central_outlet"
         p.save_outlet = True
+
+    p.current_cycle = len(op_arr) - len(yj) + 1
 
     return p
 

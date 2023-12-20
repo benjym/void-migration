@@ -38,10 +38,7 @@ def IC(p):
                         remaining, size=int(p.nm * (1 - p.large_concentration) * p.nu_fill), replace=False
                     )
                     s[i, j, small] = p.s_m
-            if hasattr(p, "charge_discharge"):
-                pre_masked = False
-            else:
-                pre_masked = True
+        pre_masked = False
     elif p.gsd_mode == "poly":  # polydisperse
         # s_0 = p.s_m / (1.0 - p.s_m)  # intermediate calculation
         s_non_dim = np.random.rand(p.nm)
@@ -57,7 +54,7 @@ def IC(p):
     # where particles are in space
     if not pre_masked:
         if p.IC_mode == "random":  # voids everywhere randomly
-            mask = np.random.rand(p.nx, p.ny, p.nm) < p.nu_fill
+            mask = np.random.rand(p.nx, p.ny, p.nm) > p.nu_fill
         elif p.IC_mode == "top":  # voids at the top
             mask = np.zeros([p.nx, p.ny, p.nm], dtype=bool)
             mask[:, int(p.fill_ratio * p.ny) :, :] = True
@@ -94,3 +91,20 @@ def set_boundary(s, X, Y, p):
         s[boundary_tile] = np.nan
     else:
         p.boundary = np.zeros([p.nx, p.ny], dtype=bool)
+
+
+def set_concentration(s, X, Y, p):
+    # if hasattr(p, "temperature"):
+    #     c = np.zeros_like(s)  # original bin that particles started in
+    #     c[int(p.internal_geometry.perf_pts[0] * p.nx) : int(p.internal_geometry.perf_pts[1] * p.nx)] = 1
+    #     c[int(p.internal_geometry.perf_pts[1] * p.nx) :] = 2
+    #     c[np.isnan(s)] = np.nan
+    if len(p.T_cycles) > 0:
+        if p.IC_mode == "full":
+            c = np.ones_like(s)
+        else:
+            c = np.zeros_like(s)  # original bin that particles started in
+    else:
+        c = None
+
+    return c

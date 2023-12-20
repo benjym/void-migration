@@ -345,6 +345,7 @@ def add_voids(u, v, s, p, c, outlet):
             for i in range(len(x_points)):
                 for k in range(p.nm):
                     s[x_points[i], 0, k] = req[i, k]
+                    c[x_points[i], 0, k] = p.current_cycle
         else:
             for i in range(len(x_points)):
                 for k in range(p.nm):
@@ -353,12 +354,14 @@ def add_voids(u, v, s, p, c, outlet):
                         and np.count_nonzero(np.isnan(s[x_points[i], :, k])) == p.ny
                     ):
                         s[x_points[i], 0, k] = req[i, k]
+                        c[x_points[i], 0, k] = p.current_cycle
                     else:
                         a = np.max(np.argwhere(~np.isnan(s[x_points[i], :, k])))  # choose the max ht
                         if a >= p.ny - 2:
                             pass
                         else:
                             s[x_points[i], a + 1, k] = req[i, k]  # place a cell on the topmost cell "a+1"
+                            c[x_points[i], a + 1, k] = p.current_cycle
 
     return u, v, s, c, outlet
 
