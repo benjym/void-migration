@@ -97,7 +97,7 @@ def move_voids(
     #         np.random.shuffle(m_loop)
     #         for k in m_loop:
     nu = 1.0 - np.mean(np.isnan(s[:, :, :]), axis=2)
-    kernel = np.array([[0, 1, 0], [1, 0, 1], [0, 0, 0]]).T
+    kernel = np.array([[0, 1, 0], [1, 0, 1], [0, 1, 0]])
     nu_max = maximum_filter(nu, footprint=kernel)  # , mode='constant', cval=0.0)
     # import matplotlib.pyplot as plt
     # plt.figure(7)
@@ -345,7 +345,8 @@ def add_voids(u, v, s, p, c, outlet):
             for i in range(len(x_points)):
                 for k in range(p.nm):
                     s[x_points[i], 0, k] = req[i, k]
-                    # c[x_points[i], 0, k] = p.current_cycle
+                    if ~np.isnan(req[i, k]):
+                        c[x_points[i], 0, k] = p.current_cycle
         else:
             for i in range(len(x_points)):
                 for k in range(p.nm):
@@ -354,14 +355,16 @@ def add_voids(u, v, s, p, c, outlet):
                         and np.count_nonzero(np.isnan(s[x_points[i], :, k])) == p.ny
                     ):
                         s[x_points[i], 0, k] = req[i, k]
-                        # c[x_points[i], 0, k] = p.current_cycle
+                        if ~np.isnan(req[i, k]):
+                            c[x_points[i], 0, k] = p.current_cycle
                     else:
                         a = np.max(np.argwhere(~np.isnan(s[x_points[i], :, k])))  # choose the max ht
                         if a >= p.ny - 2:
                             pass
                         else:
                             s[x_points[i], a + 1, k] = req[i, k]  # place a cell on the topmost cell "a+1"
-                            # c[x_points[i], a + 1, k] = p.current_cycle
+                            if ~np.isnan(req[i, k]):
+                                c[x_points[i], a + 1, k] = p.current_cycle
 
     return u, v, s, c, outlet
 

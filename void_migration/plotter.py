@@ -358,6 +358,7 @@ def plot_u(x, y, s, u, v, p, t):
 
 
 def plot_c(x, y, s, c, p, t):
+    # print(np.unique(c))
     plt.figure(fig)
 
     nm = s.shape[2]
@@ -365,7 +366,7 @@ def plot_c(x, y, s, c, p, t):
 
     plt.clf()
     plt.pcolormesh(
-        x, y, np.ma.masked_where(mask, np.nanmean(c, axis=2)).T, cmap=inferno, vmin=0, vmax=len(p.T_cycles)
+        x, y, np.ma.masked_where(mask, np.nanmean(c, axis=2)).T, cmap=inferno, vmin=0, vmax=p.num_cycles
     )
     if p.internal_geometry:
         if p.internal_geometry["perf_plate"]:
