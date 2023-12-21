@@ -40,7 +40,7 @@
     videos : ['nu','s'], // which variables to save videos of.
     save : [], // which variables to save. By default none.
     mask_s_bar : true, // should the images of s_bar be masked to hide areas of low density
-    T_cycles : [], // a list containing dicts that define any cycles
+    num_cycles : 0, // a list containing dicts that define any cycles
 
     // parallel code
     max_workers : "None", // max number of workers to run simultaneously. Default value is actually set void_migration.py

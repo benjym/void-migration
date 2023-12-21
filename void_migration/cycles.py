@@ -51,6 +51,7 @@ def charge_discharge(p, t):
         p.save_outlet = True
 
     p.current_cycle = len(op_arr) - len(yj) + 1
+    p.num_cycles = len(op_arr)
 
     return p
 

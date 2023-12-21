@@ -99,11 +99,12 @@ def set_concentration(s, X, Y, p):
     #     c[int(p.internal_geometry.perf_pts[0] * p.nx) : int(p.internal_geometry.perf_pts[1] * p.nx)] = 1
     #     c[int(p.internal_geometry.perf_pts[1] * p.nx) :] = 2
     #     c[np.isnan(s)] = np.nan
-    if len(p.T_cycles) > 0:
+    if p.charge_discharge:
         if p.IC_mode == "full":
             c = np.ones_like(s)
         else:
             c = np.zeros_like(s)  # original bin that particles started in
+            c[np.isnan(s)] = np.nan
     else:
         c = None
 
