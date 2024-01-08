@@ -241,6 +241,8 @@ def add_voids(u, v, s, p, c, outlet):
                             s[target, -1, k], s[i, 0, k] = s[i, 0, k], s[target, -1, k]
                     else:
                         s[i, 0, k] = np.nan
+                        if hasattr(p, "charge_discharge"):
+                            c[i, 0, k] = np.nan
                     outlet[-1] += 1
     # elif temp_mode == "temperature":  # Remove at central outlet
     #     for i in range(nx // 2 - half_width, nx // 2 + half_width + 1):
@@ -345,7 +347,7 @@ def add_voids(u, v, s, p, c, outlet):
             for i in range(len(x_points)):
                 for k in range(p.nm):
                     s[x_points[i], 0, k] = req[i, k]
-                    if ~np.isnan(req[i, k]):
+                    if ~np.isnan(s[x_points[i], 0, k]):
                         c[x_points[i], 0, k] = p.current_cycle
         else:
             for i in range(len(x_points)):
@@ -355,7 +357,7 @@ def add_voids(u, v, s, p, c, outlet):
                         and np.count_nonzero(np.isnan(s[x_points[i], :, k])) == p.ny
                     ):
                         s[x_points[i], 0, k] = req[i, k]
-                        if ~np.isnan(req[i, k]):
+                        if ~np.isnan(s[x_points[i], 0, k]):
                             c[x_points[i], 0, k] = p.current_cycle
                     else:
                         a = np.max(np.argwhere(~np.isnan(s[x_points[i], :, k])))  # choose the max ht
@@ -363,7 +365,7 @@ def add_voids(u, v, s, p, c, outlet):
                             pass
                         else:
                             s[x_points[i], a + 1, k] = req[i, k]  # place a cell on the topmost cell "a+1"
-                            if ~np.isnan(req[i, k]):
+                            if ~np.isnan(s[x_points[i], a + 1, k]):
                                 c[x_points[i], a + 1, k] = p.current_cycle
 
     return u, v, s, c, outlet

@@ -22,6 +22,10 @@ def IC(p):
                 fill = rng.choice(p.nm, size=int(p.nm * p.nu_fill), replace=False)
                 s[i, j, fill] = p.s_m
         p.s_M = p.s_m
+        if hasattr(p, "charge_discharge"):
+            pre_masked = False
+        else:
+            pre_masked = True
     if p.gsd_mode == "bi":  # bidisperse
         if (p.nm * p.large_concentration * p.nu_fill) < 2:
             s = np.random.choice([p.s_m, p.s_M], size=[p.nx, p.ny, p.nm])
@@ -38,7 +42,11 @@ def IC(p):
                         remaining, size=int(p.nm * (1 - p.large_concentration) * p.nu_fill), replace=False
                     )
                     s[i, j, small] = p.s_m
-        pre_masked = False
+                    if hasattr(p, "charge_discharge"):
+                        pre_masked = False
+                    else:
+                        pre_masked = True
+        # pre_masked = True
     elif p.gsd_mode == "poly":  # polydisperse
         # s_0 = p.s_m / (1.0 - p.s_m)  # intermediate calculation
         s_non_dim = np.random.rand(p.nm)
@@ -99,7 +107,7 @@ def set_concentration(s, X, Y, p):
     #     c[int(p.internal_geometry.perf_pts[0] * p.nx) : int(p.internal_geometry.perf_pts[1] * p.nx)] = 1
     #     c[int(p.internal_geometry.perf_pts[1] * p.nx) :] = 2
     #     c[np.isnan(s)] = np.nan
-    if p.charge_discharge:
+    if hasattr(p, "charge_discharge"):  # p.charge_discharge:
         if p.IC_mode == "full":
             c = np.ones_like(s)
         else:

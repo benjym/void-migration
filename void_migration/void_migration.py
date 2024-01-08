@@ -68,6 +68,7 @@ def time_march(p):
     s = initial.IC(p)  # non-dimensional size
     u = np.zeros([p.nx, p.ny])
     v = np.zeros([p.nx, p.ny])
+
     p_count = np.zeros([p.nt])
     p_count_s = np.zeros([p.nt])
     p_count_l = np.zeros([p.nt])
@@ -114,7 +115,8 @@ def time_march(p):
             plotter.update(x, y, s, u, v, c, T, outlet, p, t, s_ms)
 
         t += 1
-
+    if hasattr(p, "charge_discharge"):
+        plotter.c_d_saves(p, non_zero_nu_time, p_count, p_count_s, p_count_l)
     plotter.update(x, y, s, u, v, c, T, outlet, p, t, s_ms)
 
 
@@ -124,6 +126,7 @@ def run_simulation(sim_with_index):
         dict, p_init = params.load_file(f)
     folderName = f"output/{dict['input_filename']}/"
     dict_copy = dict.copy()
+
     for i, key in enumerate(p_init.list_keys):
         dict_copy[key] = sim[i]
         folderName += f"{key}_{sim[i]}/"
@@ -144,7 +147,6 @@ if __name__ == "__main__":
 
     # run simulations
     all_sims = list(product(*p_init.lists))
-
     folderNames = []
     with concurrent.futures.ProcessPoolExecutor(max_workers=p_init.max_workers) as executor:
         results = list(

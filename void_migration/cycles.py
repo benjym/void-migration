@@ -15,13 +15,13 @@ def charge_discharge(p, t, change_s_ms):
     this is done in the time_march function
     """
 
-    if p.gsd_mode == "mono":
-        colsm = []
-        for i in range(p.no_of_cycles):
-            if i % 2 == 0:
-                colsm.append(change_s_ms[0])
-            else:
-                colsm.append(change_s_ms[1])
+    # if p.gsd_mode == "mono":
+    #     colsm = []
+    #     for i in range(p.no_of_cycles):
+    #         if i % 2 == 0:
+    #             colsm.append(change_s_ms[0])
+    #         else:
+    #             colsm.append(change_s_ms[1])
 
     res = [sub["t_empty"] for sub in op_arr]  # Just take the t_empty values from the op_arr dictionary
 
@@ -30,14 +30,14 @@ def charge_discharge(p, t, change_s_ms):
         if t < int(np.ceil(res[j] / p.dt)):
             yj.append(op_arr[j])
 
-    if p.gsd_mode == "mono":
-        col_index = colsm[int(len(op_arr) - len(yj))]
+    # if p.gsd_mode == "mono":
+    #     col_index = colsm[int(len(op_arr) - len(yj))]
 
     if t <= int(
         np.ceil(yj[0].get("t_fill") / p.dt)
     ):  # To always pick the time belonging to the first element in the array
         if p.gsd_mode == "mono":
-            p.s_m = col_index
+            # p.s_m = col_index
             p.s_M = p.s_m
             p.add_voids = "place_on_top"  # 'pour_base'
         else:

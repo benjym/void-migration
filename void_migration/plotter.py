@@ -22,7 +22,7 @@ _video_encoding = [
     "22",
 ]  # powerpoint compatible
 
-_dpi = 100
+_dpi = 20
 plt.rcParams["figure.dpi"] = _dpi
 
 
@@ -119,8 +119,8 @@ def update(x, y, s, u, v, c, T, outlet, p, t, *args):
     #     np.savetxt(p.folderName + "outlet_T.csv", np.array(outlet_T), delimiter=",")
     if "velocity" in p.save:
         np.savetxt(p.folderName + "u.csv", u / np.sum(np.isnan(s), axis=2), delimiter=",")
-    if "charge_discharge" in p.save:
-        c_d_saves(p, non_zero_nu_time, p_count, p_count_s, p_count_l)
+    # if "charge_discharge" in p.save:
+    #     c_d_saves(p, non_zero_nu_time, p_count, p_count_s, p_count_l)
 
 
 def plot_u_time(y, U, nu_time, p):
@@ -183,8 +183,8 @@ def c_d_saves(p, non_zero_nu_time, *args):
     if p.gsd_mode == "mono":
         np.save(p.folderName + "cell_count.npy", args[0])
     elif p.gsd_mode == "bi":
-        np.save(p.folderName + "cell_count_s.npy", args[0])
-        np.save(p.folderName + "cell_count_l.npy", args[1])
+        np.save(p.folderName + "cell_count_s.npy", args[1])
+        np.save(p.folderName + "cell_count_l.npy", args[2])
 
 
 def kozeny_carman(s):
@@ -226,11 +226,7 @@ def plot_s(x, y, s, p, t, *args):
         s_plot = np.nanmean(s, axis=2).T
     s_plot = np.ma.masked_where(np.isnan(s_plot), s_plot)
 
-    if hasattr(p, "charge_discharge") and p.gsd_mode == "mono":
-        plt.pcolormesh(x, y, s_plot, cmap=cmap, vmin=args[0][0], vmax=args[0][1])
-    else:
-        plt.pcolormesh(x, y, s_plot, cmap=orange_blue_cmap, vmin=p.s_m, vmax=p.s_M)
-        # plt.colorbar()
+    plt.pcolormesh(x, y, s_plot, cmap=orange_blue_cmap, vmin=p.s_m, vmax=p.s_M)
 
     if p.internal_geometry:
         for i in p.internal_geometry["perf_pts"]:
@@ -242,7 +238,7 @@ def plot_s(x, y, s, p, t, *args):
     plt.subplots_adjust(left=0, right=1, bottom=0, top=1)
     if hasattr(p, "plot_colorbar"):
         plt.colorbar(shrink=0.8, location="top", pad=0.01, ticks=ticks)
-    plt.savefig(p.folderName + "s_" + str(t).zfill(6) + ".png")
+    plt.savefig(p.folderName + "s_" + str(t).zfill(6) + ".png", bbox_inches="tight", dpi=100)
 
 
 def save_s(x, y, s, p, t):
@@ -256,8 +252,7 @@ def plot_nu(x, y, s, p, t):
     if p.internal_geometry:
         nu = np.ma.masked_where(p.boundary.T, nu)
     plt.clf()
-
-    plt.pcolormesh(x, y, nu, cmap=inferno_r, vmin=0, vmax=1)
+    plt.pcolormesh(x, y, nu, cmap="inferno", vmin=0, vmax=1)
     if p.internal_geometry:
         if p.internal_geometry["perf_plate"]:
             for i in p.internal_geometry["perf_pts"]:
@@ -268,7 +263,7 @@ def plot_nu(x, y, s, p, t):
     plt.subplots_adjust(left=0, right=1, bottom=0, top=1)
     if hasattr(p, "plot_colorbar"):
         plt.colorbar(shrink=0.8, location="top", pad=0.01)
-    plt.savefig(p.folderName + "nu_" + str(t).zfill(6) + ".png")
+    plt.savefig(p.folderName + "nu_" + str(t).zfill(6) + ".png", bbox_inches="tight", dpi=100)
 
 
 def save_nu(x, y, s, p, t):
@@ -358,7 +353,6 @@ def plot_u(x, y, s, u, v, p, t):
 
 
 def plot_c(x, y, s, c, p, t):
-    # print(np.unique(c))
     plt.figure(fig)
 
     nm = s.shape[2]
@@ -376,7 +370,9 @@ def plot_c(x, y, s, c, p, t):
     plt.xlim(x[0], x[-1])
     plt.ylim(y[0], y[-1])
     plt.subplots_adjust(left=0, right=1, bottom=0, top=1)
-    plt.savefig(p.folderName + "c_" + str(t).zfill(6) + ".png")
+    if hasattr(p, "plot_colorbar"):
+        plt.colorbar(shrink=0.8, location="top", pad=0.01)  # ,ticks = ticks)
+    plt.savefig(p.folderName + "c_" + str(t).zfill(6) + ".png", bbox_inches="tight", dpi=100)
 
 
 def save_c(c, folderName, t):
