@@ -1,10 +1,10 @@
 import numpy as np
 
 op_arr = []
-s_ms = [0, 0]
+# s_ms = [0, 0]
 
 
-def charge_discharge(p, t, change_s_ms):
+def charge_discharge(p, t):
     """
     As of now two times (t_fill and t_empty) are calculated and t_settle is given
     t_fill - filling time
@@ -14,14 +14,6 @@ def charge_discharge(p, t, change_s_ms):
     (mainly to assign different colors for different cycle), and
     this is done in the time_march function
     """
-
-    # if p.gsd_mode == "mono":
-    #     colsm = []
-    #     for i in range(p.no_of_cycles):
-    #         if i % 2 == 0:
-    #             colsm.append(change_s_ms[0])
-    #         else:
-    #             colsm.append(change_s_ms[1])
 
     res = [sub["t_empty"] for sub in op_arr]  # Just take the t_empty values from the op_arr dictionary
 
@@ -43,6 +35,8 @@ def charge_discharge(p, t, change_s_ms):
         else:
             p.add_voids = "place_on_top"
 
+        # p.half_width = 30
+
     elif int(np.ceil(yj[0].get("t_fill") / p.dt)) < t <= int(np.ceil(yj[0].get("t_settle") / p.dt)):
         p.add_voids = "None"
 
@@ -50,10 +44,12 @@ def charge_discharge(p, t, change_s_ms):
         p.add_voids = "central_outlet"
         p.save_outlet = True
 
+        # p.half_width = 4
+
     p.current_cycle = len(op_arr) - len(yj) + 1
     p.num_cycles = len(op_arr)
 
-    return p, change_s_ms
+    return p
 
 
 def cals_in_cd(p):

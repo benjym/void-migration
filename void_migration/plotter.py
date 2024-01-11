@@ -22,7 +22,7 @@ _video_encoding = [
     "22",
 ]  # powerpoint compatible
 
-_dpi = 20
+_dpi = 100
 plt.rcParams["figure.dpi"] = _dpi
 
 
@@ -82,10 +82,7 @@ def set_plot_size(p):
 
 def update(x, y, s, u, v, c, T, outlet, p, t, *args):
     if "s" in p.plot:
-        if hasattr(p, "charge_discharge"):
-            plot_s(x, y, s, p, t, *args)
-        else:
-            plot_s(x, y, s, p, t)
+        plot_s(x, y, s, p, t)
     if "nu" in p.plot:
         plot_nu(x, y, s, p, t)
     if "rel_nu" in p.plot:
@@ -238,7 +235,7 @@ def plot_s(x, y, s, p, t, *args):
     plt.subplots_adjust(left=0, right=1, bottom=0, top=1)
     if hasattr(p, "plot_colorbar"):
         plt.colorbar(shrink=0.8, location="top", pad=0.01, ticks=ticks)
-    plt.savefig(p.folderName + "s_" + str(t).zfill(6) + ".png", bbox_inches="tight", dpi=100)
+    plt.savefig(p.folderName + "s_" + str(t).zfill(6) + ".png")  # , bbox_inches="tight", dpi=100)
 
 
 def save_s(x, y, s, p, t):
@@ -263,7 +260,7 @@ def plot_nu(x, y, s, p, t):
     plt.subplots_adjust(left=0, right=1, bottom=0, top=1)
     if hasattr(p, "plot_colorbar"):
         plt.colorbar(shrink=0.8, location="top", pad=0.01)
-    plt.savefig(p.folderName + "nu_" + str(t).zfill(6) + ".png", bbox_inches="tight", dpi=100)
+    plt.savefig(p.folderName + "nu_" + str(t).zfill(6) + ".png")  # , bbox_inches="tight", dpi=100)
 
 
 def save_nu(x, y, s, p, t):
@@ -372,7 +369,7 @@ def plot_c(x, y, s, c, p, t):
     plt.subplots_adjust(left=0, right=1, bottom=0, top=1)
     if hasattr(p, "plot_colorbar"):
         plt.colorbar(shrink=0.8, location="top", pad=0.01)  # ,ticks = ticks)
-    plt.savefig(p.folderName + "c_" + str(t).zfill(6) + ".png", bbox_inches="tight", dpi=100)
+    plt.savefig(p.folderName + "c_" + str(t).zfill(6) + ".png")  # , bbox_inches="tight", dpi=100)
 
 
 def save_c(c, folderName, t):

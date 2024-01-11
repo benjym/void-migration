@@ -42,11 +42,10 @@ def IC(p):
                         remaining, size=int(p.nm * (1 - p.large_concentration) * p.nu_fill), replace=False
                     )
                     s[i, j, small] = p.s_m
-                    if hasattr(p, "charge_discharge"):
-                        pre_masked = False
-                    else:
-                        pre_masked = True
-        # pre_masked = True
+        if hasattr(p, "charge_discharge"):
+            pre_masked = False
+        else:
+            pre_masked = True
     elif p.gsd_mode == "poly":  # polydisperse
         # s_0 = p.s_m / (1.0 - p.s_m)  # intermediate calculation
         s_non_dim = np.random.rand(p.nm)
@@ -99,6 +98,46 @@ def set_boundary(s, X, Y, p):
         s[boundary_tile] = np.nan
     else:
         p.boundary = np.zeros([p.nx, p.ny], dtype=bool)
+
+
+def inclination(p, s):
+    """
+    This function is used when the bottom of silo is to be constructed with
+    certain angle with horizontal. The variable used is form_angle which
+    is by default set to 0 in defaults.json5
+    """
+    if p.form_angle == 0:
+        pass
+    elif p.form_angle > 0:
+        req_r = np.arange(p.nx // 2 + p.half_width + 1, p.nx, 1) - (p.nx // 2 + p.half_width + 1)
+        req_r_y = []
+        for i in req_r:
+            if (
+                round(np.tan(np.radians(p.form_angle)) * i) < 2
+            ):  # to avoid larger outlet when angle becomes less
+                req_r_y.append(2)
+            else:
+                req_r_y.append(round(np.tan(np.radians(p.form_angle)) * i))
+
+        req_l = np.arange(0, p.nx // 2 - p.half_width, 1)
+        req_l_y = []
+        for i in req_l:
+            if round(np.tan(np.radians(p.form_angle)) * i) < 2:
+                req_l_y.append(2)
+            else:
+                req_l_y.append(round(np.tan(np.radians(p.form_angle)) * i))
+
+        x_vals = np.concatenate((req_l, (p.nx // 2 + p.half_width + 1) + req_r))
+        y_vals = np.concatenate((req_l_y[::-1], req_r_y))
+        print(x_vals)
+
+        for i in range(len(x_vals)):
+            for j in range(y_vals[i]):
+                s[x_vals[i], j, :] = 0
+
+        s = np.ma.masked_where(s == 0, s)
+
+    return s
 
 
 def set_concentration(s, X, Y, p):

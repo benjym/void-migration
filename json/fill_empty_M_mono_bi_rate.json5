@@ -1,28 +1,27 @@
 {
     // resolution
-    nx : [51], // width
-    ny : [101], // height
-    nm : [10],  // number of simultaneous simulations
+    nx : [81], // width
+    ny : [71], // height
+    nm : [100],  // number of simultaneous simulations
 
     // geometry
     H : [60], // m
-    theta : 0.0,  // angle of gravity - keep set to zero
+    theta: 0.0,  // angle of gravity - keep set to zero
     refill : false,  // should particles go back to top or not
     add_voids : "None",
-    form_angle : 45,
     
     IC_mode : "empty",  // just leave empty space at the top
     
     // material properties
     alpha : [1],
     rho_p : 3950, 
-    free_par : 0.17,
+    free_par : 0.08,
     // mu : [0.5,1.0,2.0],  // friction angle
     repose_angle : [30],  // friction angle, degrees
-    half_width : [4],  // half width of outlet in grid points
-    s_m : 0.00005, // minimum particle size (m)
-    //s_M : 0.00009, // maximum particle size (m)
-    gsd_mode : 'mono',//'bi',//'mono',
+    half_width : [30],  // half width of outlet in grid points
+    s_m : 0.000045, // minimum particle size (m)
+    s_M : 0.00009, // maximum particle size (m)
+    gsd_mode : 'bi',//'bi',//'mono',
     nu_cs : 0.5,  // critical density above which motion stops
 
     // initial conditions
@@ -37,21 +36,21 @@
     
     // saving
     save_inc : 5,  // how often to save
-    save_outlet : true,
+    save_outlet : false,
 
     // testing area
     close_voids : false,
     no_of_cycles : 3,
     charge_discharge : true,
     give_mass : true,
-    M_ins : [{A : 0.3, B : 0.3, C : 0.3}], //length should be same as no_of_cycles and indicates fraction of Total mass
-    M_empty : [{A : 0.8, B : 0.8, C : 0.8}], //length should be same as no_of_cycles and indicates fraction of Input mass
-    T_settle : [{A : 10, B : 10, C : 10}], //length should be same as no_of_cycles and indicates time for settling after pouring
+    M_ins : [{A : 0.6, B : 0.6, C : 0.6}], //length should be same as no_of_cycles and indicates fraction of Total mass
+    M_empty : [{A : 0.5, B : 0.5, C : 0.5}], //length should be same as no_of_cycles and indicates fraction of Input mass
+    T_settle : [{A : 3500, B : 3500, C : 3500}], //length should be same as no_of_cycles and indicates time for settling after pouring
     //T_in : [{A : 12, B : 11, C : 5}],
     //T_settle : [{A : 1, B : 3, C : 3}],
     //T_empty : [{A : 1, B : 2, C : 2}],
     plot : ['nu', 's', 'c'],
     plot_colorbar : true,
     //save : 's','rel_nu','nu',
-    save : ["outlet","charge_discharge"],
+    save : ['outlet'],
 }

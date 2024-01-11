@@ -13,6 +13,7 @@
     internal_geometry : false, // true if internal geometry is present, currently defined only for a single case
     cyclic_BC : false, // true if cyclic BCs are used horizontally
     refill : false, // should the particles come back in the top if they leave the bottom
+    form_angle : 0, // inclination angle in silo
     
     // void migration model parameters
     diag : 0,

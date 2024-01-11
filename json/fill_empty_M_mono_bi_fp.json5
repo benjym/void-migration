@@ -18,14 +18,14 @@
     free_par : 0.08,
     // mu : [0.5,1.0,2.0],  // friction angle
     repose_angle : [30],  // friction angle, degrees
-    half_width : [4],  // half width of outlet in grid points
+    half_width : [2],  // half width of outlet in grid points
     s_m : 0.000045, // minimum particle size (m)
     s_M : 0.00009, // maximum particle size (m)
     gsd_mode : 'bi',//'bi',//'mono',
     nu_cs : 0.5,  // critical density above which motion stops
 
     // initial conditions
-    fill_ratio : [0.4], //0.2,0.5,1],  // how high to fill the container initially
+    fill_ratio : [0.05], //0.2,0.5,1],  // how high to fill the container initially
     // IC_mode : 'random',
     // fill : 0.3
 

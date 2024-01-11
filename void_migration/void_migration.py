@@ -30,8 +30,8 @@ def time_march(p):
 
     plotter.set_plot_size(p)
 
-    s_ms = [0, 0]
-    change_s_ms = [p.s_m, p.s_m + p.s_m * 0.000001]
+    # s_ms = [0, 0]
+    # change_s_ms = [p.s_m, p.s_m + p.s_m * 0.000001]
 
     y = np.linspace(0, p.H, p.ny)
     p.dy = y[1] - y[0]
@@ -66,6 +66,7 @@ def time_march(p):
         p.nt = int(np.ceil(p.t_f / p.dt))
 
     s = initial.IC(p)  # non-dimensional size
+    s = initial.inclination(p, s)  # masks the region depending upon slope angle
     u = np.zeros([p.nx, p.ny])
     v = np.zeros([p.nx, p.ny])
 
@@ -86,7 +87,7 @@ def time_march(p):
 
     outlet = []
     plotter.save_coordinate_system(x, y, p)
-    plotter.update(x, y, s, u, v, c, T, outlet, p, t, s_ms)
+    plotter.update(x, y, s, u, v, c, T, outlet, p, t)
 
     N_swap = None
     p.indices = np.arange(p.nx * (p.ny - 1) * p.nm)
@@ -101,7 +102,7 @@ def time_march(p):
             T = thermal.update_temperature(s, T, p)
 
         if hasattr(p, "charge_discharge"):
-            p, s_ms = cycles.charge_discharge(p, t, change_s_ms)
+            p = cycles.charge_discharge(p, t)
             p_count[t], p_count_s[t], p_count_l[t], non_zero_nu_time[t] = cycles.save_quantities(p, s)
 
         u, v, s, c, T, N_swap = motion.move_voids(u, v, s, p, c=c, T=T, N_swap=N_swap)
@@ -112,12 +113,12 @@ def time_march(p):
             u, v, s = motion.close_voids(u, v, s)
 
         if t % p.save_inc == 0:
-            plotter.update(x, y, s, u, v, c, T, outlet, p, t, s_ms)
+            plotter.update(x, y, s, u, v, c, T, outlet, p, t)
 
         t += 1
     if hasattr(p, "charge_discharge"):
         plotter.c_d_saves(p, non_zero_nu_time, p_count, p_count_s, p_count_l)
-    plotter.update(x, y, s, u, v, c, T, outlet, p, t, s_ms)
+    plotter.update(x, y, s, u, v, c, T, outlet, p, t)
 
 
 def run_simulation(sim_with_index):
