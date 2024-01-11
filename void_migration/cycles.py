@@ -1,7 +1,7 @@
 import numpy as np
 
 op_arr = []
-s_ms = [0, 0]
+# s_ms = [0, 0]
 
 
 def charge_discharge(p, t):
@@ -15,14 +15,6 @@ def charge_discharge(p, t):
     this is done in the time_march function
     """
 
-    if p.gsd_mode == "mono":
-        colsm = []
-        for i in range(p.no_of_cycles):
-            if i % 2 == 0:
-                colsm.append(p.s_m)
-            else:
-                colsm.append(p.s_m * 1.00000000001)
-
     res = [sub["t_empty"] for sub in op_arr]  # Just take the t_empty values from the op_arr dictionary
 
     yj = []
@@ -30,18 +22,20 @@ def charge_discharge(p, t):
         if t < int(np.ceil(res[j] / p.dt)):
             yj.append(op_arr[j])
 
-    if p.gsd_mode == "mono":
-        col_index = colsm[int(len(op_arr) - len(yj))]
+    # if p.gsd_mode == "mono":
+    #     col_index = colsm[int(len(op_arr) - len(yj))]
 
     if t <= int(
         np.ceil(yj[0].get("t_fill") / p.dt)
     ):  # To always pick the time belonging to the first element in the array
         if p.gsd_mode == "mono":
-            p.s_m = col_index
+            # p.s_m = col_index
             p.s_M = p.s_m
             p.add_voids = "place_on_top"  # 'pour_base'
         else:
             p.add_voids = "place_on_top"
+
+        # p.half_width = 30
 
     elif int(np.ceil(yj[0].get("t_fill") / p.dt)) < t <= int(np.ceil(yj[0].get("t_settle") / p.dt)):
         p.add_voids = "None"
@@ -49,6 +43,8 @@ def charge_discharge(p, t):
     elif int(np.ceil(yj[0].get("t_settle") / p.dt)) < t < int(np.ceil(yj[0].get("t_empty") / p.dt) - 1):
         p.add_voids = "central_outlet"
         p.save_outlet = True
+
+        # p.half_width = 4
 
     p.current_cycle = len(op_arr) - len(yj) + 1
     p.num_cycles = len(op_arr)

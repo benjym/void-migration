@@ -30,6 +30,9 @@ def time_march(p):
 
     plotter.set_plot_size(p)
 
+    # s_ms = [0, 0]
+    # change_s_ms = [p.s_m, p.s_m + p.s_m * 0.000001]
+
     y = np.linspace(0, p.H, p.ny)
     p.dy = y[1] - y[0]
     x = np.linspace(-p.nx * p.dy / 2, p.nx * p.dy / 2, p.nx)  # force equal grid spacing
@@ -63,8 +66,10 @@ def time_march(p):
         p.nt = int(np.ceil(p.t_f / p.dt))
 
     s = initial.IC(p)  # non-dimensional size
+    s = initial.inclination(p, s)  # masks the region depending upon slope angle
     u = np.zeros([p.nx, p.ny])
     v = np.zeros([p.nx, p.ny])
+
     p_count = np.zeros([p.nt])
     p_count_s = np.zeros([p.nt])
     p_count_l = np.zeros([p.nt])
@@ -111,7 +116,8 @@ def time_march(p):
             plotter.update(x, y, s, u, v, c, T, outlet, p, t)
 
         t += 1
-
+    if hasattr(p, "charge_discharge"):
+        plotter.c_d_saves(p, non_zero_nu_time, p_count, p_count_s, p_count_l)
     plotter.update(x, y, s, u, v, c, T, outlet, p, t)
 
 
@@ -121,6 +127,7 @@ def run_simulation(sim_with_index):
         dict, p_init = params.load_file(f)
     folderName = f"output/{dict['input_filename']}/"
     dict_copy = dict.copy()
+
     for i, key in enumerate(p_init.list_keys):
         dict_copy[key] = sim[i]
         folderName += f"{key}_{sim[i]}/"
@@ -141,7 +148,6 @@ if __name__ == "__main__":
 
     # run simulations
     all_sims = list(product(*p_init.lists))
-
     folderNames = []
     with concurrent.futures.ProcessPoolExecutor(max_workers=p_init.max_workers) as executor:
         results = list(
