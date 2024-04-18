@@ -23,10 +23,54 @@ def stable_slope(
     Returns:
         True if the void should NOT swap with a solid particle (i.e. the slope is stable). False otherwise.
     """
-    if ((nu[dest, j] > nu[i, j]) and ((nu[dest, j] - nu[i, j]) < p.mu * p.nu_cs)) and (nu[i, j + 1] == 0):
-        return True
-    else:
-        return False
+    # if ((nu[dest, j] > nu[i, j]) and ((nu[dest, j] - nu[i, j]) < p.mu * p.nu_cs)) and (nu[i, j + 1] == 0):
+    # next = dest + (dest - i)
+    # two_next = dest + 2 * (dest - i)
+    # if next >= p.nx:
+    #     next = p.nx - 1
+    # if next < 0:
+    #     next = 0
+    # if two_next >= p.nx:
+    #     two_next = p.nx - 1
+    # if two_next < 0:
+    #     two_next = 0
+    # if (
+    #     (nu[dest, j] > nu[i, j])
+    #     and ((-3 * nu[dest, j] - 2 * nu[i, j] + 6 * nu[next, j] - nu[two_next, j]) < 2 * p.mu * p.nu_cs)
+    # ) and (nu[i, j + 1] == 0):
+    #     return True
+    # else:
+    return False
+
+
+def stability_check(nu, p):
+    kernel = np.array([[0, 1, 0], [1, 0, 1], [0, 1, 0]])
+    nu_max = maximum_filter(nu, footprint=kernel)  # , mode='constant', cval=0.0)
+    nu_up = np.roll(nu, -1, axis=1)
+    # nu_up[:, 0] = nu[:,0]
+    dh_dx, dh_dy = np.gradient(nu)  # this works with spacing of 1 (h = nu/dx)
+    angle = np.arctan2(dh_dx, dh_dy)
+    mag = np.sqrt(dh_dx**2 + dh_dy**2)
+
+    # import matplotlib.pyplot as plt
+    # plt.figure(98)
+    # plt.clf()
+    # plt.ion()
+    # plt.imshow(angle.T, cmap='bwr')
+    # # plt.imshow(mag.T)
+    # # plt.imshow(dh_dx.T, cmap="bwr")
+    # plt.colorbar()
+    # plt.pause(1)
+    # plt.ioff()
+
+    # return (
+    #     (nu_max == 0) | (nu > p.nu_cs) | ((np.abs(dh_dx) < p.mu * p.nu_cs) & (nu_up == 0))
+    # )
+    return (
+        (nu_max == 0)
+        | (nu > p.nu_cs)
+        | ((np.abs(angle) < np.radians(p.repose_angle)) & (mag > p.nu_cs / 2.0))
+    )
 
 
 # @njit
@@ -84,43 +128,18 @@ def move_voids(
 
     # N_swap = np.ones_like(s[:, :, 0]) # HACK - SET NON-ZERO Tg EVERYWHERE FOR TESTING
 
-    # y_loop = np.arange(p.ny - 2, -1, -1)
-    # np.random.shuffle(y_loop)
-    # for j in y_loop:
-    #     if p.internal_geometry:
-    #         x_loop = np.arange(p.nx)[~p.boundary[:, j]]  # don't move apparent voids at boundaries
-    #     else:
-    #         x_loop = np.arange(p.nx)
-    #     np.random.shuffle(x_loop)
-    #     for i in x_loop:
-    #         m_loop = np.arange(p.nm)
-    #         np.random.shuffle(m_loop)
-    #         for k in m_loop:
     nu = 1.0 - np.mean(np.isnan(s[:, :, :]), axis=2)
-    kernel = np.array([[0, 1, 0], [1, 0, 1], [0, 1, 0]])
-    nu_max = maximum_filter(nu, footprint=kernel)  # , mode='constant', cval=0.0)
-    # import matplotlib.pyplot as plt
-    # plt.figure(7)
-    # plt.subplot(211)
-    # plt.imshow(nu.T)
-    # plt.colorbar()
-    # plt.subplot(212)
-    # plt.imshow(nu_max.T)
-    # plt.colorbar()
-    # plt.pause(0.001)
 
-    # dnu_dx, dnu_dy = np.gradient(nu)
+    stable = stability_check(nu, p)
+
     s_bar = operators.get_average(s)
-    s_inv_bar = operators.get_hyperbolic_average(
-        s
-    )  # HACK: SHOULD RECALCULATE AFTER EVERY SWAP — WILL BE SUPER SLOW??
-    # s_inv_bar[np.isnan(s_inv_bar)] = 1.0 / (1.0 / p.s_m + 1.0 / p.s_M)  # FIXME
-    # s_bar[np.isnan(s_bar)] = (p.s_m + p.s_M)/2.  # FIXME
+    s_inv_bar = operators.get_hyperbolic_average(s)
 
     for index in p.indices:
         i, j, k = np.unravel_index(index, [p.nx, p.ny - 1, p.nm])
         # if ( nu[i, j] < p.nu_cs ):
-        if (nu[i, j] < p.nu_cs) and nu_max[i, j] > 0:  # skip any areas where it is all voids
+        # if (nu[i, j] < p.nu_cs) and nu_max[i, j] > 0:  # skip any areas where it is all voids
+        if not stable[i, j]:
             if np.isnan(s[i, j, k]):
                 # print(s_inv_bar[i,j])
 
@@ -144,7 +163,7 @@ def move_voids(
                     l = i - 1
 
                 # if np.isnan(s[l, j + diag, k]):
-                if np.isnan(s[l, j + diag, k]) or stable_slope(s, i, j, l, p, nu):
+                if np.isnan(s[l, j + diag, k]):  # or stable_slope(s, i, j, l, p, nu):
                     P_l = 0  # P_r + P_l = 1 at s=1
                 else:
                     # P_l = (0.5 + 0.5 * np.sin(np.radians(p.theta))) / (s[l, j + diag, k]/s_inv_bar[i,j])
@@ -167,7 +186,7 @@ def move_voids(
                     r = i + 1
 
                 # if np.isnan(s[r, j + diag, k]):
-                if np.isnan(s[r, j + diag, k]) or stable_slope(s, i, j, r, p, nu):
+                if np.isnan(s[r, j + diag, k]):  # or stable_slope(s, i, j, r, p, nu):
                     P_r = 0
                 else:
                     # P_r = (0.5 - 0.5 * np.sin(np.radians(p.theta))) / (s[r, j + diag, k]/s_inv_bar[i,j])

@@ -30,6 +30,9 @@ class dict_to_class:
 
         if not os.path.exists(self.folderName):
             os.makedirs(self.folderName)
+        if len(self.save) > 0:
+            if not os.path.exists(self.folderName + "data/"):
+                os.makedirs(self.folderName + "data/")
         if hasattr(self, "aspect_ratio"):
             self.ny = int(self.nx * self.aspect_ratio)
 

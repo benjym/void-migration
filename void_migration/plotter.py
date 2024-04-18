@@ -22,7 +22,7 @@ _video_encoding = [
     "22",
 ]  # powerpoint compatible
 
-_dpi = 100
+_dpi = 20
 plt.rcParams["figure.dpi"] = _dpi
 
 
@@ -114,11 +114,11 @@ def update(x, y, s, u, v, c, T, outlet, p, t, *args):
     if "concentration" in p.save:
         save_c(c, p.folderName, t)
     if "outlet" in p.save:
-        np.savetxt(p.folderName + "outlet.csv", np.array(outlet), delimiter=",")
+        np.savetxt(p.folderName + "data/outlet.csv", np.array(outlet), delimiter=",")
     # if "temperature" in p.save:
     #     np.savetxt(p.folderName + "outlet_T.csv", np.array(outlet_T), delimiter=",")
     if "velocity" in p.save:
-        np.savetxt(p.folderName + "u.csv", u / np.sum(np.isnan(s), axis=2), delimiter=",")
+        np.savetxt(p.folderName + "data/u.csv", u / np.sum(np.isnan(s), axis=2), delimiter=",")
     if "charge_discharge" in p.save:
         c_d_saves(p, non_zero_nu_time, p_count, p_count_s, p_count_l)
 
@@ -143,8 +143,8 @@ def plot_u_time(y, U, nu_time, p):
     plt.ylabel("Height (m)")
     plt.savefig(p.folderName + "u_avg.png")
 
-    np.save(p.folderName + "u_y.npy", np.ma.filled(u_y, np.nan))
-    np.save(p.folderName + "nu.npy", np.mean(nu_time[p.nt // 2 :], axis=0))
+    np.save(p.folderName + "data/u_y.npy", np.ma.filled(u_y, np.nan))
+    np.save(p.folderName + "data/nu.npy", np.mean(nu_time[p.nt // 2 :], axis=0))
 
 
 def plot_s_bar(y, s_bar, nu_time, p):
@@ -163,7 +163,7 @@ def plot_s_bar(y, s_bar, nu_time, p):
     plt.xlabel("Time (s)")
     plt.ylabel("Height (m)")
     plt.savefig(p.folderName + "s_bar.png")
-    np.save(p.folderName + "s_bar.npy", s_bar.T)
+    np.save(p.folderName + "data/s_bar.npy", s_bar.T)
 
     plt.clf()
     plt.pcolormesh(np.linspace(0, p.t_f, p.nt), y, nu_time.T, cmap=inferno, vmin=0, vmax=1)
@@ -174,17 +174,17 @@ def plot_s_bar(y, s_bar, nu_time, p):
 
 
 def save_coordinate_system(x, y, p):
-    np.savetxt(p.folderName + "x.csv", x, delimiter=",")
-    np.savetxt(p.folderName + "y.csv", y, delimiter=",")
+    np.savetxt(p.folderName + "data/x.csv", x, delimiter=",")
+    np.savetxt(p.folderName + "data/y.csv", y, delimiter=",")
 
 
 def c_d_saves(p, non_zero_nu_time, *args):
-    np.save(p.folderName + "nu_non_zero_avg.npy", non_zero_nu_time)
+    np.save(p.folderName + "data/nu_non_zero_avg.npy", non_zero_nu_time)
     if p.gsd_mode == "mono":
-        np.save(p.folderName + "cell_count.npy", args[0])
+        np.save(p.folderName + "data/cell_count.npy", args[0])
     elif p.gsd_mode == "bi":
-        np.save(p.folderName + "cell_count_s.npy", args[0])
-        np.save(p.folderName + "cell_count_l.npy", args[1])
+        np.save(p.folderName + "data/cell_count_s.npy", args[0])
+        np.save(p.folderName + "data/cell_count_l.npy", args[1])
 
 
 def kozeny_carman(s):
@@ -215,7 +215,7 @@ def plot_permeability(x, y, s, p, t):
 
 def save_permeability(x, y, s, p, t):
     permeability = kozeny_carman(s)
-    np.savetxt(p.folderName + "permeability_" + str(t).zfill(6) + ".csv", permeability, delimiter=",")
+    np.savetxt(p.folderName + "data/permeability_" + str(t).zfill(6) + ".csv", permeability, delimiter=",")
 
 
 def plot_s(x, y, s, p, t, *args):
@@ -246,7 +246,7 @@ def plot_s(x, y, s, p, t, *args):
 
 
 def save_s(x, y, s, p, t):
-    np.save(p.folderName + "s_" + str(t).zfill(6) + ".npy", operators.get_average(s))
+    np.save(p.folderName + "data/s_" + str(t).zfill(6) + ".npy", operators.get_average(s))
 
 
 def plot_nu(x, y, s, p, t):
@@ -272,11 +272,11 @@ def plot_nu(x, y, s, p, t):
 
 
 def save_nu(x, y, s, p, t):
-    np.save(p.folderName + "nu_" + str(t).zfill(6) + ".npy", operators.get_solid_fraction(s))
+    np.save(p.folderName + "data/nu_" + str(t).zfill(6) + ".npy", operators.get_solid_fraction(s))
 
 
 def save_relative_nu(x, y, s, p, t):
-    np.save(p.folderName + "nu_" + str(t).zfill(6) + ".npy", operators.get_solid_fraction(s) / p.nu_cs)
+    np.save(p.folderName + "data/nu_" + str(t).zfill(6) + ".npy", operators.get_solid_fraction(s) / p.nu_cs)
 
 
 def plot_relative_nu(x, y, s, p, t):
@@ -380,7 +380,7 @@ def plot_c(x, y, s, c, p, t):
 
 
 def save_c(c, folderName, t):
-    np.save(folderName + "c_" + str(t).zfill(6) + ".npy", np.nanmean(c, axis=2))
+    np.save(folderName + "data/c_" + str(t).zfill(6) + ".npy", np.nanmean(c, axis=2))
 
 
 def plot_outlet(outlet, folderName):

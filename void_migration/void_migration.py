@@ -57,7 +57,7 @@ def time_march(p):
         else:
             stability *= 0.95
 
-    if hasattr(p, "charge_discharge"):
+    if p.charge_discharge:
         p.nt = cycles.set_nt(p)
     else:
         p.nt = int(np.ceil(p.t_f / p.dt))
@@ -96,7 +96,7 @@ def time_march(p):
         if hasattr(p, "temperature"):
             T = thermal.update_temperature(s, T, p)
 
-        if hasattr(p, "charge_discharge"):
+        if p.charge_discharge:
             p = cycles.charge_discharge(p, t)
             p_count[t], p_count_s[t], p_count_l[t], non_zero_nu_time[t] = cycles.save_quantities(p, s)
 

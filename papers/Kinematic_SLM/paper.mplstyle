@@ -1,0 +1,28 @@
+font.family: serif
+font.serif: CMU Serif
+font.weight: normal
+text.usetex: True
+
+font.size: 10
+xtick.labelsize: 10
+ytick.labelsize: 10
+axes.labelsize: 10
+legend.fontsize: 10
+axes.titlesize: medium
+
+legend.fancybox: True
+legend.frameon: False
+legend.framealpha: 0.8
+
+axes.linewidth: 1
+lines.linewidth: 1
+lines.markersize: 5
+
+image.cmap: inferno
+savefig.dpi: 300
+#savefig.transparent: True
+savefig.format: pdf
+
+# GM columnwidth is 238.96417pt = 3.31894680556in
+# default aspect ratio is golden ratio (1.618)
+figure.figsize: 3.31894680556, 2.051265022
