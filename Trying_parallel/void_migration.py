@@ -16,13 +16,73 @@ from itertools import product
 
 # from numba import jit, njit
 import params
-import time
 import plotter
 import thermal
 import motion
 import cycles
 import initial
-import cProfile
+
+
+def time_loop(
+    p,
+    s,
+    c,
+    T,
+    u,
+    v,
+    x,
+    y,
+    p_count,
+    p_count_s,
+    p_count_l,
+    non_zero_nu_time,
+    xpoints,
+    ypoints,
+    outlet,
+    t,
+    N_swap,
+    surface_profile,
+):
+    # for t in tqdm(range(1, p.nt), leave=False, desc="Time", position=p.concurrent_index + 1):
+
+    outlet.append(0)
+    #     u = np.zeros_like(u)
+    #     v = np.zeros_like(v)
+
+    if hasattr(p, "temperature"):
+        T = thermal.update_temperature(s, T, p)
+
+    if hasattr(p, "charge_discharge"):
+        Mass_inside = np.count_nonzero(~np.isnan(s)) * p.M_of_each_cell
+        p = cycles.charge_discharge(p, t, Mass_inside)
+        p_count[t], p_count_s[t], p_count_l[t], non_zero_nu_time[t] = cycles.save_quantities(p, s)
+        if p.get_ht == True:
+            ht = plotter.get_profile(x, y, s, c, p, t)
+            surface_profile.append(ht)
+
+    u, v, s, c, T, N_swap = motion.move_voids(u, v, s, p, c=c, T=T, N_swap=N_swap)
+
+    u, v, s, c, outlet = motion.add_voids(u, v, s, p, c, outlet)
+
+    if p.close_voids:
+        u, v, s = motion.close_voids(u, v, s)
+
+    return s, c, T, u, v, p_count, p_count_s, p_count_l, non_zero_nu_time, surface_profile, outlet
+
+    """
+        if t % p.save_inc == 0:
+            plotter.update(x, y, s, u, v, c, T, outlet, p, t)
+            if hasattr(p, "charge_discharge") and (p.gsd_mode == 'bi' or p.gsd_mode == 'fbi'):
+                plotter.plot_pdf_cdf(p,s,xpoints,ypoints,t)
+
+            p.tmp_s = s.copy()
+        t += 1     
+    if hasattr(p, "charge_discharge"):
+        plotter.c_d_saves(p, non_zero_nu_time, p_count, p_count_s, p_count_l)
+    plotter.update(x, y, s, u, v, c, T, outlet, p, t)
+
+    np.save(p.folderName + "surface_profiles.npy", surface_profile)
+    """
 
 
 def time_march(p):
@@ -45,16 +105,6 @@ def time_march(p):
 
     y += p.dy / 2.0
     t = 0
-
-    # plotter.set_plot_size(p)
-
-    # y = np.linspace(0, p.H, p.ny)
-    # p.dy = y[1] - y[0]
-    # x = np.linspace(-p.nx * p.dy / 2, p.nx * p.dy / 2, p.nx)  # force equal grid spacing
-    # X, Y = np.meshgrid(x, y, indexing="ij")
-
-    # y += p.dy / 2.0
-    # t = 0
 
     p.t_p = p.s_m / np.sqrt(p.g * p.H)  # smallest confinement timescale (at bottom) (s)
     p.free_fall_velocity = np.sqrt(p.g * (p.s_m + p.s_M) / 2.0)  # time to fall one mean diameter (s)
@@ -80,8 +130,6 @@ def time_march(p):
         else:
             stability *= 0.95
 
-    # print("********************",p.P_u_max,p.P_lr_max)
-
     if hasattr(p, "charge_discharge"):
         p.nt = cycles.set_nt(p)
     else:
@@ -93,6 +141,7 @@ def time_march(p):
     s = initial.inclination(p, s)  # masks the region depending upon slope angle
     u = np.zeros([p.nx, p.ny])
     v = np.zeros([p.nx, p.ny])
+
     p_count = np.zeros([p.nt])
     p_count_s = np.zeros([p.nt])
     p_count_l = np.zeros([p.nt])
@@ -103,13 +152,8 @@ def time_march(p):
     initial.set_boundary(s, X, Y, p)
 
     ### points to store infor about grainsize distribution ###
-    if p.silo_width == "half":
-        xpoints = np.arange(int(0.1 * p.nx), int(p.nx), int(0.1 * p.nx))
-        ypoints = np.arange(int(0.1 * p.ny), int(p.ny), int(0.1 * p.ny))
-
-    if p.silo_width == "full":
-        xpoints = np.arange(int(0.1 * p.nx), int(p.nx / 2), int(0.1 * p.nx))
-        ypoints = np.arange(int(0.1 * p.ny), int(p.ny), int(0.1 * p.ny))
+    xpoints = np.arange(int(0.1 * p.nx), int(p.nx / 2), int(0.1 * p.nx))
+    ypoints = np.arange(int(0.1 * p.ny), int(p.ny), int(0.1 * p.ny))
     ##########################################################
 
     if hasattr(p, "temperature"):
@@ -123,10 +167,12 @@ def time_march(p):
     plotter.update(x, y, s, u, v, c, T, outlet, p, t)
 
     N_swap = None
-    # p.indices = np.arange(p.nx * (p.ny - 1) * p.nm)
-    # np.random.shuffle(p.indices)
+    p.indices = np.arange(p.nx * (p.ny - 1) * p.nm)
+    np.random.shuffle(p.indices)
 
+    """
     for t in tqdm(range(1, p.nt), leave=False, desc="Time", position=p.concurrent_index + 1):
+        
         outlet.append(0)
         u = np.zeros_like(u)
         v = np.zeros_like(v)
@@ -136,37 +182,51 @@ def time_march(p):
 
         if hasattr(p, "charge_discharge"):
             Mass_inside = np.count_nonzero(~np.isnan(s)) * p.M_of_each_cell
-            # print("CCCCCCCCCCCCCCCCCCCCCCC",Mass_inside,np.count_nonzero(~np.isnan(s)))
             p = cycles.charge_discharge(p, t, Mass_inside)
             p_count[t], p_count_s[t], p_count_l[t], non_zero_nu_time[t] = cycles.save_quantities(p, s)
             if p.get_ht == True:
                 ht = plotter.get_profile(x, y, s, c, p, t)
                 surface_profile.append(ht)
-        # start_t = time.time()
+        
         u, v, s, c, T, N_swap = motion.move_voids(u, v, s, p, c=c, T=T, N_swap=N_swap)
-        # end_t = time.time()
-        # print("MMMMMMMMMMMMMMM", end_t - start_t)
 
-        # start_t = time.time()
         u, v, s, c, outlet = motion.add_voids(u, v, s, p, c, outlet)
-        # end_t = time.time()
-        # print("AAAAAAAAAAAAAAA", end_t - start_t)
 
         if p.close_voids:
             u, v, s = motion.close_voids(u, v, s)
 
         if t % p.save_inc == 0:
             plotter.update(x, y, s, u, v, c, T, outlet, p, t)
-            # if hasattr(p, "charge_discharge") and (p.gsd_mode == 'bi' or p.gsd_mode == 'fbi'):
-            #     plotter.plot_pdf_cdf(p,s,xpoints,ypoints,t)
+            if hasattr(p, "charge_discharge") and (p.gsd_mode == 'bi' or p.gsd_mode == 'fbi'):
+                plotter.plot_pdf_cdf(p,s,xpoints,ypoints,t)
 
             p.tmp_s = s.copy()
-        t += 1
+        t += 1     
     if hasattr(p, "charge_discharge"):
         plotter.c_d_saves(p, non_zero_nu_time, p_count, p_count_s, p_count_l)
     plotter.update(x, y, s, u, v, c, T, outlet, p, t)
 
     np.save(p.folderName + "surface_profiles.npy", surface_profile)
+    """
+    return (
+        p,
+        s,
+        c,
+        T,
+        u,
+        v,
+        x,
+        y,
+        p_count,
+        p_count_s,
+        p_count_l,
+        non_zero_nu_time,
+        xpoints,
+        ypoints,
+        outlet,
+        N_swap,
+        surface_profile,
+    )
 
 
 def run_simulation(sim_with_index):
@@ -175,6 +235,7 @@ def run_simulation(sim_with_index):
         dict, p_init = params.load_file(f)
     folderName = f"output/{dict['input_filename']}/"
     dict_copy = dict.copy()
+
     for i, key in enumerate(p_init.list_keys):
         dict_copy[key] = sim[i]
         folderName += f"{key}_{sim[i]}/"
@@ -182,7 +243,85 @@ def run_simulation(sim_with_index):
     p.concurrent_index = index
     p.folderName = folderName
     p.set_defaults()
-    time_march(p)
+    # time_march(p)
+    (
+        p,
+        s,
+        c,
+        T,
+        u,
+        v,
+        x,
+        y,
+        p_count,
+        p_count_s,
+        p_count_l,
+        non_zero_nu_time,
+        xpoints,
+        ypoints,
+        outlet,
+        N_swap,
+        surface_profile,
+    ) = time_march(p)
+
+    for t in tqdm(range(1, p.nt), leave=False, desc="Time", position=p.concurrent_index + 1):
+        all_s = []
+        all_c = []
+        all_u = []
+        all_v = []
+        all_T = []
+        # all_p_count = []
+        # all_p_count = []
+        with concurrent.futures.ProcessPoolExecutor() as executor:
+            results = [
+                executor.submit(
+                    time_loop,
+                    p,
+                    s,
+                    c,
+                    T,
+                    u,
+                    v,
+                    x,
+                    y,
+                    p_count,
+                    p_count_s,
+                    p_count_l,
+                    non_zero_nu_time,
+                    xpoints,
+                    ypoints,
+                    outlet,
+                    t,
+                    N_swap,
+                    surface_profile,
+                )
+                for _ in range(2)
+            ]
+
+            for f in concurrent.futures.as_completed(results):
+                # print(f.result())
+                # all_res.append(f.result())
+                # all_s.append()
+                print("*************************************", np.sum(~np.isnan(f.result()[0])))
+                all_s.append(f.result()[0])
+                all_c.append(f.result()[1])
+                all_T.append(f.result()[2])
+                all_u.append(f.result()[3])
+                all_v.append(f.result()[4])
+            all_ss = np.nanmean(all_s, axis=0)
+            # print(np.shape(all_c))
+            all_cc = np.nanmean(all_c, axis=0)
+
+        if t % p.save_inc == 0:
+            print("*************************************", np.sum(~np.isnan(all_s)))
+            plotter.update(x, y, all_ss, u, v, all_cc, T, outlet, p, t)
+            if hasattr(p, "charge_discharge") and (p.gsd_mode == "bi" or p.gsd_mode == "fbi"):
+                plotter.plot_pdf_cdf(p, s, xpoints, ypoints, t)
+
+            p.tmp_s = s.copy()
+
+        t += 1
+
     # plotter.make_video(p, p_init)
     return folderName
 
@@ -194,8 +333,8 @@ if __name__ == "__main__":
             p_init.max_workers = None
 
     # run simulations
+    print("YYYYYYYYYYYYYYYYY")
     all_sims = list(product(*p_init.lists))
-
     folderNames = []
     with concurrent.futures.ProcessPoolExecutor(max_workers=p_init.max_workers) as executor:
         results = list(

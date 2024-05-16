@@ -1,0 +1,57 @@
+{
+    // resolution
+    nx : [44], // width
+    //ny : [243], // height
+    aspect_ratio : [1.23],
+    nm : [499],  // number of simultaneous simulations
+
+    // geometry
+    H : [54], // m
+    theta : 0.0,  // angle of gravity - keep set to zero
+    refill : false,  // should particles go back to top or not
+    add_voids : "None",
+    form_angle : [0],
+    silo_width : 'full',
+    
+    IC_mode : "empty",  // just leave empty space at the top
+    
+    // material properties
+    alpha : [1],
+    rho_p : 3950, 
+    free_par : 0.09,         //0.17 - Mono; 0.11 is used to overestimate time, 0.065 - bi(ratio = 2) for alphs = 1 and nu_cs = 0.5
+    repose_angle : [30],  // friction angle, degrees
+    half_width : [3],  // half width of outlet in grid points
+    half_width_top : 3,
+    half_width_bottom : 3,
+    s_m : 0.000045, // minimum particle size (m)
+    //s_M : 0.00009, // maximum particle size (m)
+    gsd_mode : 'mono', //'bi',//'mono',
+    nu_cs : [0.5],  // critical density above which motion stops
+
+    // initial conditions
+    fill_ratio : [0.05], // solid fraction during filling
+
+    // temporal stuff
+    t_f : 85,  // final time
+
+    // testing area
+    close_voids : false,
+    no_of_cycles : 3,
+    charge_discharge : true,
+    give_mass : true,
+    M_ins : [{A : 0.3, B : 0, C : 0}], //length should be same as no_of_cycles and indicates fraction of Total mass
+    M_empty : [{A : 0, B : 0, C : 0}], //length should be same as no_of_cycles and indicates fraction of Input mass
+    T_settle1 : [{A : 0, B : 0, C : 0}], //length should be same as no_of_cycles and indicates time for settling after pouring
+    T_settle2 : [{A : 0, B : 0, C : 0}], //length should be same as no_of_cycles and indicates time for settling after discharge
+    //T_in : [{A : 12, B : 11, C : 5}],
+    //T_settle : [{A : 1, B : 3, C : 3}],
+    //T_empty : [{A : 1, B : 2, C : 2}],
+    
+    // saving
+    save_inc : 5,  // how often to save
+    save_outlet : true,
+    save: ['outlet'], //,'velocity'],
+    plot: ['c','s','nu'], //'nu'], //'nu','U_mag', 'diff_s'],
+    //videos: [], //['s','nu'],
+    plot_colorbar : true,
+}
