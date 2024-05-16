@@ -10,7 +10,7 @@
     add_voids : "None",
 
     // material properties
-    repose_angle : [0,15,30,45,60,75,90], // (degrees)
+    repose_angle : [10,70], // (degrees)
     gsd_mode : 'mono',
     s_m : 0.001, // minimum particle size (m)
     // s_M : 0.01, // maximum particle size (m)

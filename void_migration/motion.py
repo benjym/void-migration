@@ -3,10 +3,11 @@ from numpy.typing import ArrayLike
 from scipy.ndimage import maximum_filter
 import params
 import operators
+import random
+from numba import jit
 
 
 def stable_slope(
-    s: ArrayLike,
     i: int,
     j: int,
     dest: int,
@@ -29,7 +30,15 @@ def stable_slope(
         return False
 
 
-# @njit
+def find_intersection(A, B):
+    return np.array([x for x in A if x.tolist() in B.tolist()])
+
+
+def delete_element(arr, element):
+    return np.array([x for x in arr if not np.array_equal(x, element)])
+
+
+# @jit(nopython=False)
 def move_voids(
     u: ArrayLike,
     v: ArrayLike,
@@ -59,7 +68,6 @@ def move_voids(
         c: The updated concentration field
         T: The updated temperature field
     """
-
     # if p.swap_rate == "constant":
     #     swap_rate = np.ones_like(s[:, :, 0])
     # if N_swap is None:
@@ -98,7 +106,7 @@ def move_voids(
     #         for k in m_loop:
     nu = 1.0 - np.mean(np.isnan(s[:, :, :]), axis=2)
     kernel = np.array([[0, 1, 0], [1, 0, 1], [0, 1, 0]])
-    nu_max = maximum_filter(nu, footprint=kernel)  # , mode='constant', cval=0.0)
+    # nu_max = maximum_filter(nu, footprint=kernel)  # , mode='constant', cval=0.0)
     # import matplotlib.pyplot as plt
     # plt.figure(7)
     # plt.subplot(211)
@@ -117,115 +125,216 @@ def move_voids(
     # s_inv_bar[np.isnan(s_inv_bar)] = 1.0 / (1.0 / p.s_m + 1.0 / p.s_M)  # FIXME
     # s_bar[np.isnan(s_bar)] = (p.s_m + p.s_M)/2.  # FIXME
 
-    for index in p.indices:
-        i, j, k = np.unravel_index(index, [p.nx, p.ny - 1, p.nm])
-        # if ( nu[i, j] < p.nu_cs ):
-        if (nu[i, j] < p.nu_cs) and nu_max[i, j] > 0:  # skip any areas where it is all voids
-            if np.isnan(s[i, j, k]):
-                # print(s_inv_bar[i,j])
+    scale_ang = (1 + (0.3 / (p.s_M / p.s_m))) * p.repose_angle / 90  ## Is there a grainsize effect?
 
-                # t_p = dy/sqrt(g*(H-y[j])) # local confinement timescale (s)
+    ###converting mean values to i,j,k format
+    nu_req = np.repeat(nu[:, :], p.nm, axis=1).reshape(p.nx, p.ny, p.nm)
+    s_inv_bar_req = np.repeat(s_inv_bar[:, :], p.nm, axis=1).reshape(p.nx, p.ny, p.nm)
+    s_bar_req = np.repeat(s_bar[:, :], p.nm, axis=1).reshape(p.nx, p.ny, p.nm)
 
-                # if np.random.rand() < p.free_fall_velocity*p.dt/p.dy:
+    P_initial = np.random.rand(p.nx, p.ny, p.nm)
 
-                # UP
-                if np.isnan(s[i, j + 1, k]):
-                    P_u = 0
-                else:
-                    P_u = p.P_u_ref * (s_inv_bar[i, j + 1] / s[i, j + 1, k])
+    #########################################################################################################
+    ##### UP
+    # s_up = s.copy()
+    # s_up = s_up[:,1:,:]
 
-                # LEFT
-                if i == 0:
-                    if p.cyclic_BC:
-                        l = -1
-                    else:
-                        l = i  # will force P_l to be zero at boundary
-                else:
-                    l = i - 1
+    P_ups = p.P_u_ref * (s_inv_bar_req[:, 1:, :] / s[:, 1:, :])
+    # P_ups[np.isnan(P_ups)] = 0
 
-                # if np.isnan(s[l, j + diag, k]):
-                if np.isnan(s[l, j + diag, k]) or stable_slope(s, i, j, l, p, nu):
-                    P_l = 0  # P_r + P_l = 1 at s=1
-                else:
-                    # P_l = (0.5 + 0.5 * np.sin(np.radians(p.theta))) / (s[l, j + diag, k]/s_inv_bar[i,j])
-                    # P_l = p.P_lr_ref * (s_inv_bar[i, j] / s[l, j + diag, k])
-                    P_l = p.P_lr_ref * (s[l, j + diag, k] / s_bar[l, j + diag])
+    ############################### L #####################################################
 
-                # if hasattr(p, "internal_geometry"):
-                #     if p.boundary[l, j + diag]:
-                #         P_l *= p.internal_geometry["perf_rate"]
-                # if perf_plate and i-1==perf_pts[0]: P_l *= perf_rate
-                # if perf_plate and i-1==perf_pts[1]: P_l *= perf_rate
+    P_ls = p.P_lr_ref * (
+        np.concatenate((s[[0]], s[0:-1, :, :]))[:, 0:-1, :]
+        / np.concatenate((s_bar_req[[0]], s_bar_req[0:-1, :, :]))[:, 0:-1, :]
+    )
 
-                # RIGHT
-                if i == p.nx - 1:
-                    if p.cyclic_BC:
-                        r = 0
-                    else:
-                        r = i  # will force P_r to be zero at boundary
-                else:
-                    r = i + 1
+    ###################################################### R #####################################################
 
-                # if np.isnan(s[r, j + diag, k]):
-                if np.isnan(s[r, j + diag, k]) or stable_slope(s, i, j, r, p, nu):
-                    P_r = 0
-                else:
-                    # P_r = (0.5 - 0.5 * np.sin(np.radians(p.theta))) / (s[r, j + diag, k]/s_inv_bar[i,j])
-                    # P_r = p.P_lr_ref * (s_inv_bar[i, j] / s[r, j + diag, k])
-                    P_r = p.P_lr_ref * (s[r, j + diag, k] / s_bar[r, j + diag])
+    P_rs = p.P_lr_ref * (
+        np.concatenate((s[1:, :, :], s[[-1]]))[:, 0:-1, :]
+        / np.concatenate((s_bar_req[1:, :, :], s_bar_req[[-1]]))[:, 0:-1, :]
+    )
+    # P_rs[np.isnan(P_rs)] = 0
 
-                # if p.internal_geometry:
-                #     if p.boundary[r, j + diag]:
-                #         P_r *= p.internal_geometry["perf_rate"]
-                # if perf_plate and i+1==perf_pts[0]: P_r *= perf_rate
-                # if perf_plate and i+1==perf_pts[1]: P_r *= perf_rate
+    ##############################################################################################################
 
-                P_tot = P_u + P_l + P_r
-                # print(P_tot)
-                if P_tot > 1:
-                    print(f"Error: P_tot > 1, P_u = {P_u}, P_l = {P_l}, P_r = {P_r}")
+    ids_up = np.where((nu_req[:, 0:-1, :] < p.nu_cs) & (np.isnan(s[:, 0:-1, :])) & (np.isnan(s[:, 1:, :])))
+    if len(ids_up[0]) != 0:
+        P_ups[ids_up] = 0  ## make probabilities 0 at satisfied condition if probability is NaN
 
-                dest = None
-                if P_tot > 0:
-                    P = np.random.rand()
-                    if P < P_u and P_u > 0:  # go up
-                        dest = [i, j + 1, k]
-                        # v[i, j] += 1
-                        if not np.isnan(s[i, j + 1, k]):
-                            v[i, j] += 1
-                    elif P < (P_l + P_u):  # go left
-                        dest = [l, j + diag, k]
+    ids_left = np.where(
+        (nu_req[:, 0:-1, :] < p.nu_cs)
+        & (np.isnan(s[:, 0:-1, :]))
+        & (np.isnan(np.concatenate((s[[0]], s[0:-1, :, :]))[:, 0:-1, :]))
+    )
+    if len(ids_left[0]) != 0:
+        P_ls[ids_left] = 0  ## make probabilities 0 at satisfied condition if probability is NaN
 
-                        if diag == 0:
-                            u[i, j] += 1  # LEFT
-                            v[i, j] += 1
-                        else:
-                            u[i, j] += np.sqrt(2)  # UP LEFT
-                            v[i, j] += np.sqrt(2)
-                    elif P < P_tot:  # go right
-                        dest = [r, j + diag, k]
+    ids_right = np.where(
+        (nu_req[:, 0:-1, :] < p.nu_cs)
+        & (np.isnan(s[:, 0:-1, :]))
+        & (np.isnan(np.concatenate((s[1:, :, :], s[[-1]]))[:, 0:-1, :]))
+    )
+    if len(ids_right[0]) != 0:
+        P_rs[ids_right] = 0  ## make probabilities 0 at satisfied condition if probability is NaN
 
-                        if diag == 0:
-                            u[i, j] -= 1  # RIGHT
-                            v[i, j] += 1
-                        else:
-                            u[i, j] -= np.sqrt(2)  # UP RIGHT
-                            v[i, j] += np.sqrt(2)
-                    else:
-                        pass
-                        # print('NOTHING')
+    P_ts = P_ups + P_ls + P_rs
 
-                    if dest is not None:
-                        [s, c, T], nu = operators.swap([i, j, k], dest, [s, c, T], nu, p)
+    ids_up = np.where(
+        (nu_req[:, 0:-1, :] < p.nu_cs)
+        & (np.isnan(s[:, 0:-1, :]))
+        & (~np.isnan(np.isnan(s[:, 1:, :])))
+        & (P_initial[:, 0:-1, :] < (P_ups))
+        & (P_ups > 0)
+        & (P_ts > 0)
+    )
 
-                    # N_swap[i, j] += 1
-                    # N_swap[dest[0],dest[1]] += 1
+    ids_swap_up = ids_up[0], ids_up[1] + 1, ids_up[2]
+
+    ids_left = np.where(
+        (nu_req[1:, 0:-1, :] < p.nu_cs)
+        & (np.isnan(s[1:, 0:-1, :]))
+        & (
+            (~np.isnan(np.concatenate((s[[0]], s[0:-1, :, :]))[1:, 0:-1, :]))
+            & (np.invert((((nu_req[0:-1, 0:-1, :] - nu_req[1:, 0:-1, :]) < scale_ang * p.nu_cs))))
+        )
+        & (P_initial[1:, 0:-1, :] < (P_ls[1:, :, :] + P_ups[1:, :, :]))
+        & (P_ts[1:, :, :] > 0)
+        & (P_ls[1:, :, :] > 0)
+        & (P_initial[1:, 0:-1, :] >= P_ups[1:, :, :])
+    )
+
+    ids_swap_l = ids_left[0] + 1, ids_left[1], ids_left[2]
+
+    # dx_r = nu_req[1:,0:-1,:] - nu_req[0:-1,0:-1,:]
+    # dy_r = nu_req[0:-1,1:,:] - nu_req[0:-1,0:-1,:]
+
+    # angle_r = np.abs(np.degrees(np.arctan(dx_r/dy_r)))
+    # mag_r = np.sqrt(dx_r**2 + dy_r**2)
+
+    ids_right = np.where(
+        (nu_req[0:-1, 0:-1, :] < p.nu_cs)
+        & (np.isnan(s[0:-1, 0:-1, :]))
+        & (
+            (~np.isnan(np.concatenate((s[1:, :, :], s[[-1]]))[0:-1, 0:-1, :]))
+            & (np.invert((((nu_req[1:, 0:-1, :] - nu_req[0:-1, 0:-1, :]) < scale_ang * p.nu_cs))))
+        )
+        & (P_initial[0:-1, 0:-1, :] < (P_rs[0:-1, :, :] + P_ups[0:-1, :, :] + P_ls[0:-1, :, :]))
+        & (P_ts[0:-1, :, :] > 0)
+        & (P_rs[0:-1, :, :] > 0)
+        & (P_initial[0:-1, 0:-1, :] >= (P_ups[0:-1, :, :] + P_ls[0:-1, :, :]))
+    )
+
+    ids_swap_r = ids_right[0] + 1, ids_right[1], ids_right[2]
+
+    ## Destinations
+    A = np.transpose(ids_swap_up)
+    B = np.transpose(ids_left)
+    C = np.transpose(ids_swap_r)
+
+    # print("AAAAAAAAAAAAAAAAAAAA",A)
+    # print("BBBBBBBBBBBBBBBBBBBB",B)
+    # print("CCCCCCCCCCCCCCCCCCCC",C)
+
+    # Handle A intersection B intersection C
+    intersection = find_intersection(find_intersection(A, B), C)
+    for selected_element in intersection:
+        selected_array = random.choice([A, B, C])
+        if np.array_equal(selected_array, A):
+            B = delete_element(B, selected_element)
+            C = delete_element(C, selected_element)
+        elif np.array_equal(selected_array, B):
+            A = delete_element(A, selected_element)
+            C = delete_element(C, selected_element)
+        else:
+            A = delete_element(A, selected_element)
+            B = delete_element(B, selected_element)
+
+    # Handle A intersection B
+    intersection = find_intersection(A, B)
+    for selected_element in intersection:
+        selected_array = random.choice([A, B])
+        if np.array_equal(selected_array, A):
+            B = delete_element(B, selected_element)
+        else:
+            A = delete_element(A, selected_element)
+
+    # Handle B intersection C
+    intersection = find_intersection(B, C)
+    for selected_element in intersection:
+        selected_array = random.choice([B, C])
+        if np.array_equal(selected_array, B):
+            C = delete_element(C, selected_element)
+        else:
+            B = delete_element(B, selected_element)
+
+    # Handle A intersection C
+    intersection = find_intersection(A, C)
+    for selected_element in intersection:
+        selected_array = random.choice([A, C])
+        if np.array_equal(selected_array, A):
+            C = delete_element(C, selected_element)
+        else:
+            A = delete_element(A, selected_element)
+
+    # print("A:", A,len(A) > 0)
+    # print("B:", B)
+    # print("C:", C)
+    # print("AAAAAAAAAAAAAAAAAAAA",A)
+
+    A_ori = (np.array([], dtype=np.int64), np.array([], dtype=np.int64), np.array([], dtype=np.int64))
+    B_ori = (np.array([], dtype=np.int64), np.array([], dtype=np.int64), np.array([], dtype=np.int64))
+    C_ori = (np.array([], dtype=np.int64), np.array([], dtype=np.int64), np.array([], dtype=np.int64))
+
+    if len(A) > 0:
+        A_ori = tuple(np.transpose(A))
+        A_ori = A_ori[0], A_ori[1] - 1, A_ori[2]  # Source
+        A = tuple(np.transpose(A))  # Destination
+    else:
+        A = (np.array([], dtype=np.int64), np.array([], dtype=np.int64), np.array([], dtype=np.int64))
+
+    if len(B) > 0:
+        B_ori = tuple(np.transpose(B))
+        B_ori = B_ori[0] + 1, B_ori[1], B_ori[2]  # Source
+        B = tuple(np.transpose(B))  # Destination
+    else:
+        B = (np.array([], dtype=np.int64), np.array([], dtype=np.int64), np.array([], dtype=np.int64))
+
+    if len(C) > 0:
+        C_ori = tuple(np.transpose(C))
+        C_ori = C_ori[0] - 1, C_ori[1], C_ori[2]  # Source
+        C = tuple(np.transpose(C))  # Destination
+    else:
+        C = (np.array([], dtype=np.int64), np.array([], dtype=np.int64), np.array([], dtype=np.int64))
+
+    all_ids = (
+        np.hstack((A_ori[0], B_ori[0], C_ori[0])),
+        np.hstack((A_ori[1], B_ori[1], C_ori[1])),
+        np.hstack((A_ori[2], B_ori[2], C_ori[2])),
+    )
+    all_swap_ids = (
+        np.hstack((A[0], B[0], C[0])),
+        np.hstack((A[1], B[1], C[1])),
+        np.hstack((A[2], B[2], C[2])),
+    )
+
+    s[all_ids], s[all_swap_ids] = s[all_swap_ids], s[all_ids]
+    c[all_ids], c[all_swap_ids] = c[all_swap_ids], c[all_ids]
+
+    # T[ids_left],T[ids_swap] = T[ids_swap],T[ids_left]
+
+    nu_req[all_ids] += 1 / p.nm
+    nu_req[all_swap_ids] -= 1 / p.nm
+
+    nu = nu_req[:, :, 0]
 
     return u, v, s, c, T, N_swap
 
 
 def add_voids(u, v, s, p, c, outlet):
     if p.add_voids == "central_outlet":  # Remove at central outlet - use this one
+        # print("UUUUUUUUUUUUUUUUUUU",p.nx // 2 - p.half_width, p.nx // 2 + p.half_width + 1)
         for i in range(p.nx // 2 - p.half_width, p.nx // 2 + p.half_width + 1):
             for k in range(p.nm):
                 # if np.random.rand() < 0.1:
@@ -241,6 +350,21 @@ def add_voids(u, v, s, p, c, outlet):
                             s[target, -1, k], s[i, 0, k] = s[i, 0, k], s[target, -1, k]
                     else:
                         s[i, 0, k] = np.nan
+                    outlet[-1] += 1
+    elif p.add_voids == "wall":  # Remove at central outlet - use this one
+        for i in range(0, p.half_width):
+            for k in range(p.nm):
+                # if np.random.rand() < 0.1:
+                if not np.isnan(s[i, 0, k]):
+                    if p.refill:
+                        if np.sum(np.isnan(s[0 : p.half_width, -1, k])) > 0:
+                            target = np.random.choice(np.nonzero(np.isnan(s[0 : p.half_width, -1, k]))[0])
+                            s[target, -1, k], s[i, 0, k] = s[i, 0, k], s[target, -1, k]
+
+                    else:
+                        s[i, 0, k] = np.nan
+                        if hasattr(p, "charge_discharge"):
+                            c[i, 0, k] = np.nan
                     outlet[-1] += 1
     # elif temp_mode == "temperature":  # Remove at central outlet
     #     for i in range(nx // 2 - half_width, nx // 2 + half_width + 1):
@@ -317,28 +441,89 @@ def add_voids(u, v, s, p, c, outlet):
 
     elif p.add_voids == "place_on_top":  # pour in centre starting at base
         if p.gsd_mode == "bi":  # bidisperse
-            x_points = np.arange(p.nx // 2 - p.half_width, p.nx // 2 + p.half_width + 1)
+            if p.silo_width == "half":
+                x_points = np.arange(0, p.half_width)
+                req = np.random.choice(
+                    [p.s_m, p.s_M], size=[p.half_width, p.nm]
+                )  # create an array of grainsizes
 
-            req = np.random.choice(
-                [p.s_m, p.s_M], size=[(p.nx // 2 + p.half_width + 1) - (p.nx // 2 - p.half_width), p.nm]
-            )  # create an array of grainsizes
-            mask = (
-                np.random.rand((p.nx // 2 + p.half_width + 1) - (p.nx // 2 - p.half_width), p.nm)
-                > p.fill_ratio
-            )  # create how much to fill
-            req[mask] = np.nan  # convert some cells to np.nan
+                mask = np.random.rand(p.half_width, p.nm) > p.fill_ratio
+                req[mask] = np.nan
+
+            elif p.silo_width == "full":
+                x_points = np.arange(p.nx // 2 - p.half_width, p.nx // 2 + p.half_width + 1)
+
+                req = np.random.choice(
+                    [p.s_m, p.s_M], size=[(p.nx // 2 + p.half_width + 1) - (p.nx // 2 - p.half_width), p.nm]
+                )  # create an array of grainsizes
+                mask = (
+                    np.random.rand((p.nx // 2 + p.half_width + 1) - (p.nx // 2 - p.half_width), p.nm)
+                    > p.fill_ratio
+                )  # create how much to fill
+                req[mask] = np.nan  # convert some cells to np.nan
+        if p.gsd_mode == "fbi":  # bidisperse
+            if p.silo_width == "half":
+                x_points = np.arange(0, p.half_width)
+                #     req = np.random.choice(
+                #     [p.s_m, p.Fr*p.s_m, p.s_M, p.Fr*p.s_M], size=[p.half_width, p.nm]
+                # )  # create an array of grainsizes
+                f_1 = p.half_width - int(p.half_width / 2)
+                f_2 = p.half_width - f_1
+                req1 = np.random.uniform(p.s_m, p.Fr * p.s_m, size=[p.nm, f_1])
+                req2 = np.random.uniform(p.s_M, p.Fr * p.s_M, size=[p.nm, f_2])
+                # print("1111111111111111111",np.shape(req1))
+                # print("2222222222222222222",np.shape(req2))
+                req3 = np.concatenate((req1, req2), axis=1)
+                # print("3333333333333333333",np.shape(req3))
+                req = req3.reshape(p.half_width, p.nm)
+                # print("4444444444444444444",np.shape(req))
+                mask = np.random.rand(p.half_width, p.nm) > p.fill_ratio
+                req[mask] = np.nan
+                # print("YYYYYYYYYYYYYYYYYYYYYY",np.sum(~np.isnan(req)), np.nanmin(req),np.nanmax(req))
+
+            elif p.silo_width == "full":
+                x_points = np.arange(p.nx // 2 - p.half_width, p.nx // 2 + p.half_width)
+
+                f_1 = int(len(x_points) - int(len(x_points) / 2))
+                f_2 = int(len(x_points) - f_1)
+
+                req1 = np.random.uniform(p.s_m, p.Fr * p.s_m, size=[p.nm, f_1])
+                req2 = np.random.uniform(p.s_M, p.Fr * p.s_M, size=[p.nm, f_2])
+
+                req3 = np.concatenate((req1, req2), axis=1)
+
+                req = req3.reshape(int(len(x_points)), p.nm)
+
+                mask = (
+                    np.random.rand((p.nx // 2 + p.half_width) - (p.nx // 2 - p.half_width), p.nm)
+                    > p.fill_ratio
+                )  # create how much to fill
+                req[mask] = np.nan  # convert some cells to np.nan
+                # print("YYYYYYYYYYYYYYYYYYYYYY",np.sum(~np.isnan(req)), np.nanmin(req),np.nanmax(req), f_1, f_2, np.shape(req), np.shape(mask))
+
         if p.gsd_mode == "mono":
-            x_points = np.arange(p.nx // 2 - p.half_width, p.nx // 2 + p.half_width + 1)
-            req = p.s_m * np.ones(
-                [(p.nx // 2 + p.half_width + 1) - (p.nx // 2 - p.half_width), p.nm]
-            )  # monodisperse
+            if p.silo_width == "half":
+                x_points = np.arange(0, p.half_width)
+                req = p.s_m * np.ones([p.half_width, p.nm])  # monodisperse
 
-            p.s_M = p.s_m
-            mask = (
-                np.random.rand((p.nx // 2 + p.half_width + 1) - (p.nx // 2 - p.half_width), p.nm)
-                > p.fill_ratio
-            )
-            req[mask] = np.nan
+                p.s_M = p.s_m
+                mask = np.random.rand(p.half_width, p.nm) > p.fill_ratio
+                req[mask] = np.nan
+
+            elif p.silo_width == "full":
+                x_points = np.arange(p.nx // 2 - p.half_width, p.nx // 2 + p.half_width + 1)
+                # print("UUUUUUUUUUUU",x_points)
+                req = p.s_m * np.ones(
+                    [(p.nx // 2 + p.half_width + 1) - (p.nx // 2 - p.half_width), p.nm]
+                )  # monodisperse
+
+                p.s_M = p.s_m
+                mask = (
+                    np.random.rand((p.nx // 2 + p.half_width + 1) - (p.nx // 2 - p.half_width), p.nm)
+                    > p.fill_ratio
+                )
+                req[mask] = np.nan
+                # print("IIIIIIIIIIIIIIIIIIIIIII",np.count_nonzero(req[~np.isnan(req)]))
 
         den = 1 - np.mean(np.isnan(s), axis=2)
         if np.mean(den) == 0.0:
@@ -365,7 +550,8 @@ def add_voids(u, v, s, p, c, outlet):
                             s[x_points[i], a + 1, k] = req[i, k]  # place a cell on the topmost cell "a+1"
                             if ~np.isnan(req[i, k]):
                                 c[x_points[i], a + 1, k] = p.current_cycle
-
+        # print("JJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJ",np.count_nonzero(req[~np.isnan(req)]))
+        # print("JJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJ",np.count_nonzero(s[~np.isnan(s)]),np.count_nonzero(~np.isnan(s)))
     return u, v, s, c, outlet
 
 

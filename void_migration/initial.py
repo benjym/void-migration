@@ -22,7 +22,11 @@ def IC(p):
                 fill = rng.choice(p.nm, size=int(p.nm * p.nu_fill), replace=False)
                 s[i, j, fill] = p.s_m
         p.s_M = p.s_m
-    if p.gsd_mode == "bi":  # bidisperse
+        if hasattr(p, "charge_discharge"):
+            pre_masked = False
+        else:
+            pre_masked = True
+    if p.gsd_mode == "bi" or p.gsd_mode == "fbi":  # bidisperse
         if (p.nm * p.large_concentration * p.nu_fill) < 2:
             s = np.random.choice([p.s_m, p.s_M], size=[p.nx, p.ny, p.nm])
         else:

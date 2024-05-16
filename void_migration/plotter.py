@@ -22,8 +22,8 @@ _video_encoding = [
     "22",
 ]  # powerpoint compatible
 
-_dpi = 100
-plt.rcParams["figure.dpi"] = _dpi
+_dpi = 20  # *10
+# plt.rcParams["figure.dpi"] = _dpi
 
 
 def is_ffmpeg_installed():
@@ -65,6 +65,7 @@ inferno = cm.get_cmap("inferno")
 inferno.set_bad("w", 0.0)
 inferno_r = cm.get_cmap("inferno_r")
 inferno_r.set_bad("w", 0.0)
+Dark2 = cm.get_cmap("Dark2")
 
 global fig, summary_fig
 
@@ -75,17 +76,15 @@ def set_plot_size(p):
     # wipe any existing figures
     for i in plt.get_fignums():
         plt.close(i)
-
     fig = plt.figure(figsize=[p.nx / _dpi, p.ny / _dpi])
     summary_fig = plt.figure()
 
 
 def update(x, y, s, u, v, c, T, outlet, p, t, *args):
     if "s" in p.plot:
-        if hasattr(p, "charge_discharge"):
-            plot_s(x, y, s, p, t, *args)
-        else:
-            plot_s(x, y, s, p, t)
+        plot_s(x, y, s, p, t)
+    if "diff_s" in p.plot:
+        plot_diff_s(x, y, s, p, t)
     if "nu" in p.plot:
         plot_nu(x, y, s, p, t)
     if "rel_nu" in p.plot:
@@ -147,6 +146,61 @@ def plot_u_time(y, U, nu_time, p):
     np.save(p.folderName + "nu.npy", np.mean(nu_time[p.nt // 2 :], axis=0))
 
 
+def plot_pdf_cdf(p, s, xpoints, ypoints, t):
+    # if p.gsd_mode = 'mono' or p.gsd_mode = 'bi':
+    pdfs = []
+    cdfs = []
+
+    pdfs_log = []
+    cdfs_log = []
+
+    if p.gsd_mode == "fbi":
+        binn = np.linspace(p.s_m - (p.s_m / 10), (p.Fr * p.s_M) + ((p.Fr * p.s_M) / 10), int(p.nm / 5))
+        binn_log = np.logspace(
+            np.log10(p.s_m - (p.s_m / 10)), np.log10((p.Fr * p.s_M) + ((p.Fr * p.s_M) / 10)), int(p.nm / 5)
+        )
+
+    else:
+        binn = np.linspace(p.s_m - (p.s_m / 10), p.s_M + (p.s_M / 10), int(p.nm / 5))
+        binn_log = np.logspace(np.log10(p.s_m - (p.s_m / 10)), np.log10(p.s_M + (p.s_M / 10)), int(p.nm / 5))
+
+    for i in xpoints:
+        pdfsi = []
+        cdfsi = []
+
+        pdfs_logi = []
+        cdfs_logi = []
+        for j in ypoints:
+            nu = 1 - np.mean(np.isnan(s[i, j, :]))
+            if np.count_nonzero(np.isnan(s[i, j, :])) == p.nm or nu < p.nu_cs / 7.0:
+                pdf = np.zeros(len(binn) - 1)
+                cdf = np.zeros(len(binn) - 1)
+                pdf_log = np.zeros(len(binn_log) - 1)
+                cdf_log = np.zeros(len(binn_log) - 1)
+            else:
+                count, bins_count = np.histogram(s[i, j, :], bins=binn)
+                count_log, bins_count_log = np.histogram(s[i, j, :], bins=binn_log)
+                pdf = count / np.sum(count)
+                cdf = np.cumsum(pdf)
+                pdf_log = count_log / np.sum(count_log)
+                cdf_log = np.cumsum(pdf_log)
+
+            pdfsi.append(pdf)
+            cdfsi.append(cdf)
+            pdfs_logi.append(pdf_log)
+            cdfs_logi.append(cdf_log)
+
+        pdfs.append(pdfsi)
+        cdfs.append(cdfsi)
+        pdfs_log.append(pdfs_logi)
+        cdfs_log.append(cdfs_logi)
+
+    np.save(p.folderName + "pdf_" + str(t).zfill(6) + ".npy", pdfs)
+    np.save(p.folderName + "cdf_" + str(t).zfill(6) + ".npy", cdfs)
+    np.save(p.folderName + "pdf_log_" + str(t).zfill(6) + ".npy", pdfs_log)
+    np.save(p.folderName + "cdf_log_" + str(t).zfill(6) + ".npy", cdfs_log)
+
+
 def plot_s_bar(y, s_bar, nu_time, p):
     plt.figure(summary_fig)
 
@@ -183,8 +237,9 @@ def c_d_saves(p, non_zero_nu_time, *args):
     if p.gsd_mode == "mono":
         np.save(p.folderName + "cell_count.npy", args[0])
     elif p.gsd_mode == "bi":
-        np.save(p.folderName + "cell_count_s.npy", args[0])
-        np.save(p.folderName + "cell_count_l.npy", args[1])
+        np.save(p.folderName + "cell_count.npy", args[0])
+        np.save(p.folderName + "cell_count_s.npy", args[1])
+        np.save(p.folderName + "cell_count_l.npy", args[2])
 
 
 def kozeny_carman(s):
@@ -218,19 +273,36 @@ def save_permeability(x, y, s, p, t):
     np.savetxt(p.folderName + "permeability_" + str(t).zfill(6) + ".csv", permeability, delimiter=",")
 
 
-def plot_s(x, y, s, p, t, *args):
+def plot_s(x, y, s, p, t):
     plt.figure(fig)
     plt.clf()
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", category=RuntimeWarning)
         s_plot = np.nanmean(s, axis=2).T
-    s_plot = np.ma.masked_where(np.isnan(s_plot), s_plot)
+        # s_plott = np.nanmean(s, axis=2)
+    # # s_plot = np.ma.masked_where(np.isnan(s_plot), s_plot)
+    nu = 1 - np.mean(np.isnan(s), axis=2).T
+    # s_plot = np.ma.masked_where(nu < p.nu_cs / 7.0, s_plot)   ##uncomment when masking low solid fraction values
+    # # nu[nu > p.nu_cs] = p.nu_cs
 
-    if hasattr(p, "charge_discharge") and p.gsd_mode == "mono":
-        plt.pcolormesh(x, y, s_plot, cmap=cmap, vmin=args[0][0], vmax=args[0][1])
+    # # alpha_vals = 1 - np.exp(-10*nu)
+
+    # # print("********************",np.max(nu),np.min(nu),np.max(alpha_vals),np.min(alpha_vals))
+
+    if p.gsd_mode == "fbi":
+        plt.pcolormesh(
+            x,
+            y,
+            s_plot,
+            cmap=orange_blue_cmap,
+            vmin=p.s_m - (p.s_m / 100),
+            vmax=(p.Fr * p.s_M) + ((p.Fr * p.s_M) / 100),
+        )
     else:
-        plt.pcolormesh(x, y, s_plot, cmap=orange_blue_cmap, vmin=p.s_m, vmax=p.s_M)
-        # plt.colorbar()
+        plt.pcolormesh(
+            x, y, s_plot, cmap=orange_blue_cmap, vmin=p.s_m - (p.s_m / 100), vmax=p.s_M + (p.s_M / 100)
+        )
+    # plt.pcolormesh(x, y, s_plot,cmap=orange_blue_cmap, vmin=np.min(s)-(np.min(s)/100), vmax=np.max(s)+(np.max(s)/100))
 
     if p.internal_geometry:
         for i in p.internal_geometry["perf_pts"]:
@@ -238,11 +310,43 @@ def plot_s(x, y, s, p, t, *args):
     plt.axis("off")
     plt.xlim(x[0], x[-1])
     plt.ylim(y[0], y[-1])
-    ticks = np.linspace(p.s_m, p.s_M, 3, endpoint=True)
+    if p.gsd_mode == "fbi":
+        ticks = np.linspace(p.s_m, p.s_M * p.Fr, 3, endpoint=True)
+    else:
+        ticks = np.linspace(p.s_m, p.s_M, 3, endpoint=True)
     plt.subplots_adjust(left=0, right=1, bottom=0, top=1)
     if hasattr(p, "plot_colorbar"):
-        plt.colorbar(shrink=0.8, location="top", pad=0.01, ticks=ticks)
-    plt.savefig(p.folderName + "s_" + str(t).zfill(6) + ".png")
+        plt.colorbar(shrink=0.5, location="top", pad=0.01, ticks=ticks, format="%2.1e")
+        # np.save(p.folderName + "s_" + str(t).zfill(6) + ".npy",s_plott)
+    plt.savefig(
+        p.folderName + "s_" + str(t).zfill(6) + ".png"
+    )  # ,dpi = 120/1.5)#,dpi = _dpi)#, bbox_inches="tight", dpi=100)
+
+
+def plot_diff_s(x, y, s, p, t):
+    plt.figure(fig)
+    plt.clf()
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", category=RuntimeWarning)
+
+        s_plot = np.sum(np.isnan(s), axis=2).T / p.nm
+        s_tmp_plot = np.sum(np.isnan(p.tmp_s), axis=2).T / p.nm
+    s_plot = s_plot - s_tmp_plot
+
+    plt.pcolormesh(x, y, s_plot, cmap="gray_r", vmin=0, vmax=0.125)  # ,linewidth=0,rasterized = True)
+    if p.internal_geometry:
+        for i in p.internal_geometry["perf_pts"]:
+            plt.plot([x[i], x[i]], [y[0], y[-1]], "k--", linewidth=10)
+    plt.axis("off")
+    plt.xlim(x[0], x[-1])
+    plt.ylim(y[0], y[-1])
+    ticks = np.linspace(0, 0.125, 3, endpoint=True)
+    plt.subplots_adjust(left=0, right=1, bottom=0, top=1)
+    if hasattr(p, "plot_colorbar"):
+        plt.colorbar(shrink=0.5, location="top", pad=0.01, ticks=ticks)  # , format="%2.1e")
+    plt.savefig(
+        p.folderName + "s_diff_" + str(t).zfill(6) + ".png"
+    )  # ,dpi= 100)#_dpi)#,dpi = 100)#, bbox_inches="tight", dpi=100)
 
 
 def save_s(x, y, s, p, t):
@@ -251,13 +355,19 @@ def save_s(x, y, s, p, t):
 
 def plot_nu(x, y, s, p, t):
     plt.figure(fig)
+    plt.clf()
     nu = 1 - np.mean(np.isnan(s), axis=2).T
-    nu = np.ma.masked_where(nu == 0, nu)
+    # nut = 1 - np.mean(np.isnan(s), axis=2)
+    nu = np.ma.masked_where(nu < p.nu_cs / 7.0, nu)
+    # nu[nu > p.nu_cs] = p.nu_cs
+
+    # alpha_vals = 1 - np.exp(-10*nu)
+
+    # print("-------------------------",np.max(nu),np.min(nu),np.max(alpha_vals),np.min(alpha_vals))
+
     if p.internal_geometry:
         nu = np.ma.masked_where(p.boundary.T, nu)
-    plt.clf()
-
-    plt.pcolormesh(x, y, nu, cmap=inferno_r, vmin=0, vmax=1)
+    plt.pcolormesh(x, y, nu, cmap="inferno_r", shading="auto", vmin=0, vmax=1)
     if p.internal_geometry:
         if p.internal_geometry["perf_plate"]:
             for i in p.internal_geometry["perf_pts"]:
@@ -267,8 +377,11 @@ def plot_nu(x, y, s, p, t):
     plt.ylim(y[0], y[-1])
     plt.subplots_adjust(left=0, right=1, bottom=0, top=1)
     if hasattr(p, "plot_colorbar"):
-        plt.colorbar(shrink=0.8, location="top", pad=0.01)
-    plt.savefig(p.folderName + "nu_" + str(t).zfill(6) + ".png")
+        plt.colorbar(shrink=0.5, location="top", pad=0.01)
+        # np.save(p.folderName + "nu_" + str(t).zfill(6) + ".npy",nut)
+    plt.savefig(
+        p.folderName + "nu_" + str(t).zfill(6) + ".png"
+    )  # ,dpi=_dpi)#,dpi= 100)#,dpi =  10000)#,dpi = 120)#,dpi = _dpi)#,dpi = 100)#, bbox_inches="tight", dpi=100)
 
 
 def save_nu(x, y, s, p, t):
@@ -297,8 +410,8 @@ def plot_relative_nu(x, y, s, p, t):
     plt.ylim(y[0], y[-1])
     plt.subplots_adjust(left=0, right=1, bottom=0, top=1)
     if hasattr(p, "plot_colorbar"):
-        plt.colorbar(shrink=0.8, location="top", pad=0.01)  # ,ticks = ticks)
-    plt.savefig(p.folderName + "rel_nu_" + str(t).zfill(6) + ".png")
+        plt.colorbar(shrink=0.5, location="top", pad=0.01)  # ,ticks = ticks)
+    plt.savefig(p.folderName + "rel_nu_" + str(t).zfill(6) + ".png")  # ,dpi = 120)#,dpi = _dpi)#,dpi = 100)
 
 
 def plot_u(x, y, s, u, v, p, t):
@@ -325,8 +438,11 @@ def plot_u(x, y, s, u, v, p, t):
     plt.xlim(x[0], x[-1])
     plt.ylim(y[0], y[-1])
     plt.subplots_adjust(left=0.0, right=1.0, bottom=0.0, top=1.0)
-    # plt.colorbar()
-    plt.savefig(p.folderName + "u_" + str(t).zfill(6) + ".png")
+    if hasattr(p, "plot_colorbar"):
+        plt.colorbar(shrink=0.5, location="top", pad=0.01)
+    plt.savefig(
+        p.folderName + "u_" + str(t).zfill(6) + ".png"
+    )  # ,dpi = 120)#,dpi = _dpi)#,dpi = 100)#, bbox_inches="tight", dpi=100)
 
     plt.clf()
     # plt.quiver(X,Y,u,v)
@@ -339,7 +455,11 @@ def plot_u(x, y, s, u, v, p, t):
     plt.xlim(x[0], x[-1])
     plt.ylim(y[0], y[-1])
     plt.subplots_adjust(left=0, right=1, bottom=0, top=1)
-    plt.savefig(p.folderName + "v_" + str(t).zfill(6) + ".png")
+    if hasattr(p, "plot_colorbar"):
+        plt.colorbar(shrink=0.5, location="top", pad=0.01)
+    plt.savefig(
+        p.folderName + "v_" + str(t).zfill(6) + ".png"
+    )  # ,dpi = 120)#,dpi = _dpi)#,dpi = 100)#, bbox_inches="tight", dpi=100)
 
     U = np.sqrt(u**2 + v**2)
     plt.clf()
@@ -353,8 +473,10 @@ def plot_u(x, y, s, u, v, p, t):
     plt.ylim(y[0], y[-1])
     plt.subplots_adjust(left=0, right=1, bottom=0, top=1)
     if hasattr(p, "plot_colorbar"):
-        plt.colorbar(shrink=0.8, location="top", pad=0.01)  # ,ticks = ticks)
-    plt.savefig(p.folderName + "U_mag_" + str(t).zfill(6) + ".png")
+        plt.colorbar(shrink=0.5, location="top", pad=0.01)
+    plt.savefig(
+        p.folderName + "U_mag_" + str(t).zfill(6) + ".png"
+    )  # ,dpi = 120)#,dpi = _dpi)#,dpi = 100)#, bbox_inches="tight", dpi=100)
 
 
 def plot_c(x, y, s, c, p, t):
@@ -363,10 +485,11 @@ def plot_c(x, y, s, c, p, t):
 
     nm = s.shape[2]
     mask = np.sum(np.isnan(s), axis=2) > 0.95 * nm
+    # c = np.ma.masked_where(mask, np.nanmean(c, axis=2))
 
     plt.clf()
     plt.pcolormesh(
-        x, y, np.ma.masked_where(mask, np.nanmean(c, axis=2)).T, cmap=inferno, vmin=0, vmax=p.num_cycles
+        x, y, np.ma.masked_where(mask, np.nanmean(c, axis=2)).T, cmap="inferno_r", vmin=0, vmax=p.num_cycles
     )
     if p.internal_geometry:
         if p.internal_geometry["perf_plate"]:
@@ -376,11 +499,48 @@ def plot_c(x, y, s, c, p, t):
     plt.xlim(x[0], x[-1])
     plt.ylim(y[0], y[-1])
     plt.subplots_adjust(left=0, right=1, bottom=0, top=1)
+
+    if hasattr(p, "plot_colorbar"):
+        plt.colorbar(shrink=0.8, location="top", pad=0.01)  # ,ticks = ticks)
+        # np.save(p.folderName + "c_" + str(t).zfill(6) + ".npy", np.nanmean(c, axis=2))
+
     plt.savefig(p.folderName + "c_" + str(t).zfill(6) + ".png")
 
 
 def save_c(c, folderName, t):
     np.save(folderName + "c_" + str(t).zfill(6) + ".npy", np.nanmean(c, axis=2))
+
+
+def get_profile(x, y, s, c, p, t):
+    # if p.get_ht == True:
+
+    nm = s.shape[2]
+    mask = np.sum(np.isnan(s), axis=2) > 0.95 * nm
+
+    creq = np.ma.masked_where(mask, np.nanmean(c, axis=2))
+
+    # den = 1 - np.mean(np.isnan(s), axis=2)
+    # den = np.ma.masked_where(den < p.nu_cs / 7.0, den)
+
+    if p.current_cycle == 1:
+        val = p.current_cycle
+    else:
+        val = (p.current_cycle - 1 + p.current_cycle) / 2
+
+    ht = []
+
+    for w in range(p.nx):
+        if np.argmin(creq[w]) == 0 and np.ma.is_masked(np.ma.max(creq[w])):
+            ht.append(0)
+
+        else:
+            # print("RRRRRRRRRRRRRR",creq[w],np.max(creq[w]),np.max(np.nonzero(creq[w] == np.ma.max(creq[w]))))
+            ht.append(np.max(np.nonzero(creq[w] == np.max(creq[w]))))
+            # ht.append(np.argmax(creq[w]))
+            # ht.append(np.argmax(np.nonzero(creq[w] == np.max(creq[w]))))
+
+    np.save(p.folderName + "c_" + str(t).zfill(6) + ".npy", np.nanmean(c, axis=2))
+    return ht
 
 
 def plot_outlet(outlet, folderName):
@@ -428,9 +588,10 @@ def plot_T(x, y, s, T, p, t):
     plt.savefig(p.folderName + "T_" + str(t).zfill(6) + ".png")
 
 
-def make_video(p):
+def make_video(p, p_init):
     if is_ffmpeg_installed:
         fname = p.folderName.split("/")[-2]
+        param_study = fname.rsplit("_", 1)[0]
         nice_name = "=".join(fname.rsplit("_", 1))
         subtitle = f"drawtext=text='{nice_name}':x=(w-text_w)/2:y=H-th-10:fontsize=10:fontcolor=white:box=1:boxcolor=black@0.5"
         fps = p.save_inc / p.dt
@@ -447,8 +608,17 @@ def make_video(p):
                 f"{p.folderName}/{video}_0*.png",
                 #  "-c:v", "libx264", "-pix_fmt", "yuv420p"
             ]
-            # add a title to the last video so we know whats going on
-            if i == len(p.videos) - 1:
+            if "nx" in p_init.list_keys or "ny" in p_init.list_keys:
+                # add a title to the last video so we know whats going on
+                if i == len(p.videos) - 1:
+                    # print('a')
+                    # cmd.extend(["-vf", '"scale=1000:-1, ' + subtitle + '"']) # make the video 1000 pixels wide
+                    cmd.extend(["-vf", "scale=1000:-1:flags=neighbor"])
+                else:
+                    # print('b')
+                    cmd.extend(["-vf", "scale=1000:-1:flags=neighbor"])
+            elif i == len(p.videos) - 1:
+                # print('c')
                 cmd.extend(["-vf", subtitle])
             cmd.extend(["-r", "30", *_video_encoding, f"{p.folderName}/{video}_video.mp4"])
             subprocess.run(
