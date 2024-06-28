@@ -49,11 +49,15 @@ class dict_to_class:
                 self.s_m = 1
                 self.s_M = 1
 
-        # user can define mu or repose_angle. If both defined, repose_angle takes precedence.
+        # user can define mu or repose_angle. If both defined, mu takes precedence.
         if hasattr(self, "mu"):
             self.repose_angle = np.degrees(np.arctan(self.mu))
         if hasattr(self, "repose_angle"):
             self.mu = np.tan(np.radians(self.repose_angle))
+
+        with np.errstate(divide="ignore", invalid="ignore"):
+            inv_mu = np.nan_to_num(1.0 / self.mu, nan=0.0, posinf=1e30, neginf=0.0)
+        self.delta_limit = self.nu_cs / (inv_mu + 1)
 
 
 def load_file(f):

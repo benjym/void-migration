@@ -4,16 +4,18 @@
     // nx : 50, // width
     // ny : 20, // height
     // nm : 20,  // number of simultaneous simulations
-    
-    // nice version
+
+    // paper version
     nx : 100, // width
     ny : 50, // height
     nm : 100,  // number of simultaneous simulations
+    
     // geometry
     H : 1, // (m)
 
     // material properties
-    repose_angle : [0,5,10,15,20,25,30,35,40,45], // (degrees)
+    // repose_angle : [0,5,10,15,20,25,30,35,40,45], // (degrees)
+    repose_angle : [0,25,50,75,90], // (degrees)
     gsd_mode : 'mono',
     s_m : 0.0005, // minimum particle size (m)
     s_M : 0.0005, // maximum particle size (m)
@@ -27,7 +29,7 @@
     
     // saving
     save_inc : 10,
-    t_f : 100,  // s
+    t_f : 150,  // s
     plot : ['nu'],
     videos : ['nu'],
     save : ['nu'],

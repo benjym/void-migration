@@ -17,7 +17,7 @@ x = np.linspace(-W / 2, W / 2, p.nx)
 p.dx = x[1] - x[0]
 
 L = W / 6.0  # length of dashed line
-L_0 = W / 6.0  # intersection point with y data
+L_0 = W / 10.0  # intersection point with y data
 y_off = 0  # -0.005
 
 cmap = colormaps["inferno"]
@@ -45,8 +45,15 @@ for i, angle in enumerate(p.repose_angle):
 
         ax[0].plot(x, top, label=rf"$\varphi={angle}^\circ$", color=color)
 
-        fit_min_arg = np.argmin(np.abs(x + L_0 + L / 2.0))
-        fit_max_arg = np.argmin(np.abs(x + L_0 - L / 2.0))
+        max_L = W / np.tan(np.radians(angle))
+        min_L = 2.5 * p.dx
+
+        this_L = np.minimum(L, max_L)
+        this_L = np.maximum(this_L, min_L)
+        # print(f"angle={angle}, max_L={max_L}, this_L={this_L}")
+
+        fit_min_arg = np.argmin(np.abs(x + L_0 + this_L / 2.0))
+        fit_max_arg = np.argmin(np.abs(x + L_0 - this_L / 2.0))
         x_fit = x[fit_min_arg:fit_max_arg]
 
         # ax[0].plot(
@@ -59,6 +66,7 @@ for i, angle in enumerate(p.repose_angle):
         #     color=color,
         # )
         coefficients = np.polyfit(x_fit, top[fit_min_arg:fit_max_arg], 1)
+        # print(np.degrees(np.arctan(coefficients[0])))
 
         ax[0].plot(x_fit, coefficients[0] * x_fit + coefficients[1], ls="--", lw=2, color=color)
 
@@ -96,13 +104,19 @@ new_x = label_position.x0 + 4  # Adjust this value to move the label
 cbar.ax.yaxis.set_label_coords(new_x, 0.5)
 
 plt.sca(ax[1])
-plt.plot([0, 45], [0, 45], "k--")
+# plt.plot([0, 45], [0, 45], "k--")
+plt.plot([0, 90], [0, 90], "k--")
 plt.xlabel(r"$\varphi$ (degrees)", labelpad=0)
 plt.ylabel("Measured angle of repose\n(degrees)")
-plt.xticks([0, 15, 30, 45])
-plt.yticks([0, 15, 30, 45])
-plt.xlim([0, 45])
-plt.ylim([0, 45])
+# plt.xticks([0, 15, 30, 45])
+# plt.yticks([0, 15, 30, 45])
+plt.xticks([0, 30, 60, 90])
+plt.yticks([0, 30, 60, 90])
+
+# plt.xlim([0, 45])
+# plt.ylim([0, 45])
+plt.xlim([0, 90])
+plt.ylim([0, 90])
 
 plt.subplots_adjust(left=0.2, bottom=0.15, right=0.97, top=0.97, hspace=0.4)
 plt.savefig(os.path.expanduser("~/Dropbox/Apps/Overleaf/Kinematic SLM/im/collapse_angle.pdf"))

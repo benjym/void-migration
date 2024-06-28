@@ -5,72 +5,69 @@ import params
 import operators
 
 
-def stable_slope(
-    s: ArrayLike,
-    i: int,
-    j: int,
-    dest: int,
-    p: params.dict_to_class,
-    nu: ArrayLike,
-) -> bool:
-    """Determine whether a void should swap with a solid particle.
+def stable_slope(s, i, j, dest, p):
+    """
+    Determines if the slope between two points is stable based on the solid fraction difference.
 
-    Args:
-        i: an integer representing a row index
-        j: an integer representing a column index
-        lr: the cell we want to move into
+    Parameters:
+    - s (object): The simulation state, containing the grid and relevant data.
+    - i (int): The current row index in the grid.
+    - j (int): The current column index in the grid.
+    - dest (int): The destination row index for comparison.
+    - p (object): An object containing simulation parameters, including the delta_limit.
 
     Returns:
-        True if the void should NOT swap with a solid particle (i.e. the slope is stable). False otherwise.
+    - bool: True if the difference in solid fraction between the current point and the destination
+        point is less than or equal to the delta_limit, indicating a stable slope. False otherwise.
+
+    This function calculates the solid fraction at the current point (i, j) and at a destination point
+    (dest, j), then compares the difference in solid fraction to a threshold (delta_limit) defined in
+    the parameter object p. If the difference is less than or equal to the threshold, the function
+    returns True, indicating the slope is stable. Otherwise, it returns False.
     """
-    # if ((nu[dest, j] > nu[i, j]) and ((nu[dest, j] - nu[i, j]) < p.mu * p.nu_cs)) and (nu[i, j + 1] == 0):
-    # next = dest + (dest - i)
-    # two_next = dest + 2 * (dest - i)
-    # if next >= p.nx:
-    #     next = p.nx - 1
-    # if next < 0:
-    #     next = 0
-    # if two_next >= p.nx:
-    #     two_next = p.nx - 1
-    # if two_next < 0:
-    #     two_next = 0
-    # if (
-    #     (nu[dest, j] > nu[i, j])
-    #     and ((-3 * nu[dest, j] - 2 * nu[i, j] + 6 * nu[next, j] - nu[two_next, j]) < 2 * p.mu * p.nu_cs)
-    # ) and (nu[i, j + 1] == 0):
-    #     return True
-    # else:
-    return False
+    nu_here = operators.get_solid_fraction(s, [i, j])
+    nu_dest = operators.get_solid_fraction(s, [dest, j])
+    delta_nu = nu_dest - nu_here
+
+    return delta_nu <= p.delta_limit
 
 
-def stability_check(nu, p):
+def locally_solid(s, i, j, p):
+    """
+    Determines if a given point in the simulation grid is locally solid based on the solid fraction threshold.
+
+    Parameters:
+    - s (object): The simulation state, containing the grid and relevant data.
+    - i (int): The row index of the point in the grid.
+    - j (int): The column index of the point in the grid.
+    - p (object): An object containing simulation parameters, including the critical solid fraction threshold (nu_cs).
+
+    Returns:
+    - bool: True if the solid fraction at the given point is greater than or equal to the critical solid fraction threshold (nu_cs), indicating the point is locally solid. False otherwise.
+
+    This function calculates the solid fraction at the specified point (i, j) in the simulation grid. It then compares this value to the critical solid fraction threshold (nu_cs) defined in the parameter object p. If the solid fraction at the point is greater than or equal to nu_cs, the function returns True, indicating the point is considered locally solid. Otherwise, it returns False.
+    """
+    nu = operators.get_solid_fraction(s, [i, j])
+    return nu >= p.nu_cs
+
+
+def empty_nearby(nu, p):
+    """
+    Identifies empty spaces adjacent to each point in a grid based on a given solid fraction matrix.
+
+    Parameters:
+    - nu (numpy.ndarray): A 2D array representing the solid fraction at each point in the grid.
+    - p (object): An object containing simulation parameters, not used in this function but included for consistency with the interface.
+
+    Returns:
+    - numpy.ndarray: A boolean array where True indicates an empty space adjacent to the corresponding point in the input grid.
+
+    This function applies a maximum filter with a cross-shaped kernel to the solid fraction matrix 'nu'. The kernel is defined to consider the four cardinal directions (up, down, left, right) adjacent to each point. The maximum filter operation identifies the maximum solid fraction value in the neighborhood defined by the kernel for each point. Points where the maximum solid fraction in their neighborhood is 0 are considered adjacent to an empty space, and the function returns a boolean array marking these points as True.
+    """
     kernel = np.array([[0, 1, 0], [1, 0, 1], [0, 1, 0]])
     nu_max = maximum_filter(nu, footprint=kernel)  # , mode='constant', cval=0.0)
-    nu_up = np.roll(nu, -1, axis=1)
-    # nu_up[:, 0] = nu[:,0]
-    dh_dx, dh_dy = np.gradient(nu)  # this works with spacing of 1 (h = nu/dx)
-    angle = np.arctan2(dh_dx, dh_dy)
-    mag = np.sqrt(dh_dx**2 + dh_dy**2)
 
-    # import matplotlib.pyplot as plt
-    # plt.figure(98)
-    # plt.clf()
-    # plt.ion()
-    # plt.imshow(angle.T, cmap='bwr')
-    # # plt.imshow(mag.T)
-    # # plt.imshow(dh_dx.T, cmap="bwr")
-    # plt.colorbar()
-    # plt.pause(1)
-    # plt.ioff()
-
-    # return (
-    #     (nu_max == 0) | (nu > p.nu_cs) | ((np.abs(dh_dx) < p.mu * p.nu_cs) & (nu_up == 0))
-    # )
-    return (
-        (nu_max == 0)
-        | (nu > p.nu_cs)
-        | ((np.abs(angle) < np.radians(p.repose_angle)) & (mag > p.nu_cs / 2.0))
-    )
+    return nu_max == 0
 
 
 # @njit
@@ -130,7 +127,7 @@ def move_voids(
 
     nu = 1.0 - np.mean(np.isnan(s[:, :, :]), axis=2)
 
-    stable = stability_check(nu, p)
+    skip = empty_nearby(nu, p)
 
     s_bar = operators.get_average(s)
     s_inv_bar = operators.get_hyperbolic_average(s)
@@ -139,106 +136,105 @@ def move_voids(
         i, j, k = np.unravel_index(index, [p.nx, p.ny - 1, p.nm])
         # if ( nu[i, j] < p.nu_cs ):
         # if (nu[i, j] < p.nu_cs) and nu_max[i, j] > 0:  # skip any areas where it is all voids
-        if not stable[i, j]:
+        if not skip[i, j]:
             if np.isnan(s[i, j, k]):
-                # print(s_inv_bar[i,j])
+                if not locally_solid(s, i, j, p):
+                    # print(s_inv_bar[i,j])
 
-                # t_p = dy/sqrt(g*(H-y[j])) # local confinement timescale (s)
+                    # t_p = dy/sqrt(g*(H-y[j])) # local confinement timescale (s)
 
-                # if np.random.rand() < p.free_fall_velocity*p.dt/p.dy:
+                    # if np.random.rand() < p.free_fall_velocity*p.dt/p.dy:
 
-                # UP
-                if np.isnan(s[i, j + 1, k]):
-                    P_u = 0
-                else:
-                    P_u = p.P_u_ref * (s_inv_bar[i, j + 1] / s[i, j + 1, k])
-
-                # LEFT
-                if i == 0:
-                    if p.cyclic_BC:
-                        l = -1
+                    # UP
+                    if np.isnan(s[i, j + 1, k]):
+                        P_u = 0
                     else:
-                        l = i  # will force P_l to be zero at boundary
-                else:
-                    l = i - 1
+                        P_u = p.P_u_ref * (s_inv_bar[i, j + 1] / s[i, j + 1, k])
 
-                # if np.isnan(s[l, j + diag, k]):
-                if np.isnan(s[l, j + diag, k]):  # or stable_slope(s, i, j, l, p, nu):
-                    P_l = 0  # P_r + P_l = 1 at s=1
-                else:
-                    # P_l = (0.5 + 0.5 * np.sin(np.radians(p.theta))) / (s[l, j + diag, k]/s_inv_bar[i,j])
-                    # P_l = p.P_lr_ref * (s_inv_bar[i, j] / s[l, j + diag, k])
-                    P_l = p.P_lr_ref * (s[l, j + diag, k] / s_bar[l, j + diag])
-
-                # if hasattr(p, "internal_geometry"):
-                #     if p.boundary[l, j + diag]:
-                #         P_l *= p.internal_geometry["perf_rate"]
-                # if perf_plate and i-1==perf_pts[0]: P_l *= perf_rate
-                # if perf_plate and i-1==perf_pts[1]: P_l *= perf_rate
-
-                # RIGHT
-                if i == p.nx - 1:
-                    if p.cyclic_BC:
-                        r = 0
-                    else:
-                        r = i  # will force P_r to be zero at boundary
-                else:
-                    r = i + 1
-
-                # if np.isnan(s[r, j + diag, k]):
-                if np.isnan(s[r, j + diag, k]):  # or stable_slope(s, i, j, r, p, nu):
-                    P_r = 0
-                else:
-                    # P_r = (0.5 - 0.5 * np.sin(np.radians(p.theta))) / (s[r, j + diag, k]/s_inv_bar[i,j])
-                    # P_r = p.P_lr_ref * (s_inv_bar[i, j] / s[r, j + diag, k])
-                    P_r = p.P_lr_ref * (s[r, j + diag, k] / s_bar[r, j + diag])
-
-                # if p.internal_geometry:
-                #     if p.boundary[r, j + diag]:
-                #         P_r *= p.internal_geometry["perf_rate"]
-                # if perf_plate and i+1==perf_pts[0]: P_r *= perf_rate
-                # if perf_plate and i+1==perf_pts[1]: P_r *= perf_rate
-
-                P_tot = P_u + P_l + P_r
-                # print(P_tot)
-                if P_tot > 1:
-                    print(f"Error: P_tot > 1, P_u = {P_u}, P_l = {P_l}, P_r = {P_r}")
-
-                dest = None
-                if P_tot > 0:
-                    P = np.random.rand()
-                    if P < P_u and P_u > 0:  # go up
-                        dest = [i, j + 1, k]
-                        # v[i, j] += 1
-                        if not np.isnan(s[i, j + 1, k]):
-                            v[i, j] += 1
-                    elif P < (P_l + P_u):  # go left
-                        dest = [l, j + diag, k]
-
-                        if diag == 0:
-                            u[i, j] += 1  # LEFT
-                            v[i, j] += 1
+                    # LEFT
+                    if i == 0:
+                        if p.cyclic_BC:
+                            l = -1
                         else:
-                            u[i, j] += np.sqrt(2)  # UP LEFT
-                            v[i, j] += np.sqrt(2)
-                    elif P < P_tot:  # go right
-                        dest = [r, j + diag, k]
-
-                        if diag == 0:
-                            u[i, j] -= 1  # RIGHT
-                            v[i, j] += 1
-                        else:
-                            u[i, j] -= np.sqrt(2)  # UP RIGHT
-                            v[i, j] += np.sqrt(2)
+                            l = i  # will force P_l to be zero at boundary
                     else:
-                        pass
-                        # print('NOTHING')
+                        l = i - 1
 
-                    if dest is not None:
-                        [s, c, T], nu = operators.swap([i, j, k], dest, [s, c, T], nu, p)
+                    if np.isnan(s[l, j + diag, k]) or stable_slope(s, i, j, l, p):
+                        P_l = 0  # P_r + P_l = 1 at s=1
+                    else:
+                        # P_l = (0.5 + 0.5 * np.sin(np.radians(p.theta))) / (s[l, j + diag, k]/s_inv_bar[i,j])
+                        # P_l = p.P_lr_ref * (s_inv_bar[i, j] / s[l, j + diag, k])
+                        P_l = p.P_lr_ref * (s[l, j + diag, k] / s_bar[l, j + diag])
 
-                    # N_swap[i, j] += 1
-                    # N_swap[dest[0],dest[1]] += 1
+                    # if hasattr(p, "internal_geometry"):
+                    #     if p.boundary[l, j + diag]:
+                    #         P_l *= p.internal_geometry["perf_rate"]
+                    # if perf_plate and i-1==perf_pts[0]: P_l *= perf_rate
+                    # if perf_plate and i-1==perf_pts[1]: P_l *= perf_rate
+
+                    # RIGHT
+                    if i == p.nx - 1:
+                        if p.cyclic_BC:
+                            r = 0
+                        else:
+                            r = i  # will force P_r to be zero at boundary
+                    else:
+                        r = i + 1
+
+                    if np.isnan(s[r, j + diag, k]) or stable_slope(s, i, j, r, p):
+                        P_r = 0
+                    else:
+                        # P_r = (0.5 - 0.5 * np.sin(np.radians(p.theta))) / (s[r, j + diag, k]/s_inv_bar[i,j])
+                        # P_r = p.P_lr_ref * (s_inv_bar[i, j] / s[r, j + diag, k])
+                        P_r = p.P_lr_ref * (s[r, j + diag, k] / s_bar[r, j + diag])
+
+                    # if p.internal_geometry:
+                    #     if p.boundary[r, j + diag]:
+                    #         P_r *= p.internal_geometry["perf_rate"]
+                    # if perf_plate and i+1==perf_pts[0]: P_r *= perf_rate
+                    # if perf_plate and i+1==perf_pts[1]: P_r *= perf_rate
+
+                    P_tot = P_u + P_l + P_r
+
+                    if P_tot > 1:
+                        print(f"Error: P_tot > 1, P_u = {P_u}, P_l = {P_l}, P_r = {P_r}")
+
+                    dest = None
+                    if P_tot > 0:
+                        P = np.random.rand()
+                        if P < P_u and P_u > 0:  # go up
+                            dest = [i, j + 1, k]
+                            # v[i, j] += 1
+                            if not np.isnan(s[i, j + 1, k]):
+                                v[i, j] += 1
+                        elif P < (P_l + P_u):  # go left
+                            dest = [l, j + diag, k]
+
+                            if diag == 0:
+                                u[i, j] += 1  # LEFT
+                                v[i, j] += 1
+                            else:
+                                u[i, j] += np.sqrt(2)  # UP LEFT
+                                v[i, j] += np.sqrt(2)
+                        elif P < P_tot:  # go right
+                            dest = [r, j + diag, k]
+
+                            if diag == 0:
+                                u[i, j] -= 1  # RIGHT
+                                v[i, j] += 1
+                            else:
+                                u[i, j] -= np.sqrt(2)  # UP RIGHT
+                                v[i, j] += np.sqrt(2)
+                        else:
+                            pass
+                            # print('NOTHING')
+
+                        if dest is not None:
+                            [s, c, T], nu = operators.swap([i, j, k], dest, [s, c, T], nu, p)
+
+                        # N_swap[i, j] += 1
+                        # N_swap[dest[0],dest[1]] += 1
 
     return u, v, s, c, T, N_swap
 
