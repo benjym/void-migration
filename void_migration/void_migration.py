@@ -3,9 +3,9 @@
 __doc__ = """
 void_migration.py
 
-This script simulates ....
+This script simulates the migration of voids in a granular material.
 """
-__author__ = "Benjy Marks"
+__author__ = "Benjy Marks, Shivakumar Athani"
 __version__ = "0.3"
 
 import sys
@@ -32,14 +32,21 @@ def time_march(p):
 
     y = np.linspace(0, p.H, p.ny)
     p.dy = y[1] - y[0]
-    x = np.linspace(-p.nx * p.dy / 2, p.nx * p.dy / 2, p.nx)  # force equal grid spacing
+    x = np.arange(-(p.nx - 0.5) / 2 * p.dy, (p.nx - 0.5) / 2 * p.dy, p.dy)  # force equal grid spacing
+    p.dx = x[1] - x[0]
+    if not np.isclose(p.dx, p.dy):
+        print(f"dx = {p.dx}, dy = {p.dy}")
+        sys.exit("Fatal error: dx != dy")
+
     X, Y = np.meshgrid(x, y, indexing="ij")
 
     y += p.dy / 2.0
     t = 0
 
-    p.t_p = p.s_m / np.sqrt(p.g * p.H)  # smallest confinement timescale (at bottom) (s)
-    p.free_fall_velocity = np.sqrt(p.g * (p.s_m + p.s_M) / 2.0)  # time to fall one mean diameter (s)
+    # p.t_p = p.s_m / np.sqrt(p.g * p.H)  # smallest confinement timescale (at bottom) (s)
+    s_bar = (p.s_m + p.s_M) / 2.0  # mean diameter (m)
+    p.free_fall_velocity = np.sqrt(p.g * s_bar)  # time to fall one mean diameter (s)
+    p.diffusivity = p.alpha * p.free_fall_velocity * s_bar  # diffusivity (m^2/s)
 
     safe = False
     stability = 0.5
@@ -47,7 +54,8 @@ def time_march(p):
         p.P_u_ref = stability
         p.dt = p.P_u_ref * p.dy / p.free_fall_velocity
 
-        p.P_lr_ref = p.alpha * p.P_u_ref
+        p.P_lr_ref = p.diffusivity * p.dt / p.dy**2  # ignoring factor of 2 because gets called twice
+        # p.P_lr_ref = p.alpha * p.P_u_ref
 
         p.P_u_max = p.P_u_ref * (p.s_M / p.s_m)
         p.P_lr_max = p.P_lr_ref * (p.s_M / p.s_m)

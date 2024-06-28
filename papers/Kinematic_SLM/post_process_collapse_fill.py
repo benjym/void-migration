@@ -30,7 +30,7 @@ ax = fig.subplots(2, 3)
 for i, fill in enumerate(p.nu_fill):
     print(fill)
     try:
-        files = glob(f"output/collapse_fill/nu_fill_{fill}/nu_*.npy")
+        files = glob(f"output/collapse_fill/nu_fill_{fill}/data/nu_*.npy")
         files.sort()
 
         data = np.load(files[0])

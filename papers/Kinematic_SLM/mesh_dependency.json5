@@ -1,7 +1,7 @@
 {
     // resolution
     // testing
-    nx : 40, // width
+    nx : [40,80,160], // width
 
     // paper version
     // nx : 100, // width
@@ -13,7 +13,7 @@
 
     // material properties
     // repose_angle : [0,5,10,15,20,25,30,35,40,45], // (degrees)
-    repose_angle : [0,25,50,75,90], // (degrees)
+    repose_angle : 30, // (degrees)
     gsd_mode : 'mono',
     s_m : 0.01, // minimum particle size (m)
     s_M : 0.01, // maximum particle size (m)

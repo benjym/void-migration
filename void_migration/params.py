@@ -33,8 +33,10 @@ class dict_to_class:
         if len(self.save) > 0:
             if not os.path.exists(self.folderName + "data/"):
                 os.makedirs(self.folderName + "data/")
-        if hasattr(self, "aspect_ratio"):
-            self.ny = int(self.nx * self.aspect_ratio)
+        if hasattr(self, "aspect_ratio_y"):
+            self.ny = int(self.nx * self.aspect_ratio_y)
+        if hasattr(self, "aspect_ratio_m"):
+            self.nm = int(self.nx * self.aspect_ratio_m)
 
         if self.gsd_mode == "mono":
             if hasattr(self, "s_m") and hasattr(self, "s_M"):
