@@ -5,6 +5,7 @@ from matplotlib.colors import LinearSegmentedColormap
 import matplotlib.cm as cm
 import warnings
 import operators
+import motion
 
 # _video_encoding = ["-c:v", "libx265", "-preset", "fast", "-crf", "28", "-tag:v", "hvc1"] # nice small file sizes
 _video_encoding = [
@@ -22,7 +23,7 @@ _video_encoding = [
     "22",
 ]  # powerpoint compatible
 
-_dpi = 20
+_dpi = 10
 plt.rcParams["figure.dpi"] = _dpi
 
 
@@ -100,6 +101,8 @@ def update(x, y, s, u, v, c, T, outlet, p, t, *args):
     #     plot_profile(x, nu_time_x, p)
     if "permeability" in p.plot:
         plot_permeability(x, y, s, p, t)
+    if "stable" in p.plot:
+        plot_stable(x, y, s, p, t)
 
     if "s" in p.save:
         save_s(x, y, s, p, t)
@@ -145,6 +148,38 @@ def plot_u_time(y, U, nu_time, p):
 
     np.save(p.folderName + "data/u_y.npy", np.ma.filled(u_y, np.nan))
     np.save(p.folderName + "data/nu.npy", np.mean(nu_time[p.nt // 2 :], axis=0))
+
+
+def plot_stable(x, y, s, p, t):
+    plt.figure(fig)
+
+    slope = np.zeros([p.nx, p.ny, 2])
+    solid = np.zeros([p.nx, p.ny])
+    for i in range(1, p.nx - 1):
+        for j in range(p.ny):
+            slope[i, j, 0] = motion.stable_slope(s, i, j, i - 1, p)
+            slope[i, j, 1] = motion.stable_slope(s, i, j, i + 1, p)
+
+    for i in range(p.nx):
+        for j in range(p.ny):
+            solid[i, j] = motion.locally_solid(s, i, j, p)
+
+    nu = operators.get_solid_fraction(s)
+    empty = motion.empty_nearby(nu, p)
+
+    for f in [
+        [slope[:, :, 0], "slope_right"],
+        [slope[:, :, 1], "slope_left"],
+        [solid, "solid"],
+        [empty, "empty"],
+    ]:
+        plt.clf()
+        plt.pcolormesh(x, y, f[0].T, cmap=inferno)
+        plt.axis("off")
+        plt.xlim(x[0], x[-1])
+        plt.ylim(y[0], y[-1])
+        plt.subplots_adjust(left=0, right=1, bottom=0, top=1)
+        plt.savefig(p.folderName + f[1] + f"_{t}.png")
 
 
 def plot_s_bar(y, s_bar, nu_time, p):
@@ -433,18 +468,18 @@ def make_video(p):
         fname = p.folderName.split("/")[-2]
         nice_name = "=".join(fname.rsplit("_", 1))
         subtitle = f"drawtext=text='{nice_name}':x=(w-text_w)/2:y=H-th-10:fontsize=10:fontcolor=white:box=1:boxcolor=black@0.5"
-        fps = p.save_inc / p.dt
-
+        # fps = p.save_inc / p.dt
+        # print(f"Making video at {fps} fps, {p.save_inc} frames per cycle, {p.dt} s per frame")
         for i, video in enumerate(p.videos):
             cmd = [
                 "ffmpeg",
                 "-y",
-                "-r",
-                f"{fps}",
+                # "-r",
+                # f"{fps}",
                 "-pattern_type",
                 "glob",
                 "-i",
-                f"{p.folderName}/{video}_0*.png",
+                f"{p.folderName}/{video}_*.png",
                 #  "-c:v", "libx264", "-pix_fmt", "yuv420p"
             ]
             # add a title to the last video so we know whats going on

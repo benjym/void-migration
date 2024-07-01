@@ -39,10 +39,11 @@
     plot : ['nu', 's'], // which variables to plot. Should at least include the ones to make videos.
     videos : ['nu','s'], // which variables to save videos of.
     save : [], // which variables to save. By default none.
-    mask_s_bar : true, // should the images of s_bar be masked to hide areas of low density
+    mask_s_bar : false, // should the images of s_bar be masked to hide areas of low density
     num_cycles : 0, // a list containing dicts that define any cycles
     charge_discharge : false, // should the system be charged and discharged
 
     // parallel code
-    max_workers : "None", // max number of workers to run simultaneously. Default value is actually set void_migration.py
+    max_workers : 4, // max number of workers to run simultaneously. Default value is actually set void_migration.py
+    vectorized : true, // should the code be vectorized (i.e. faster)
 }

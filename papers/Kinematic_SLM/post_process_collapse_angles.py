@@ -28,6 +28,7 @@ ax = fig.subplots(2, 1)
 
 for i, angle in enumerate(p.repose_angle):
     try:
+        stds = None
         files = glob(f"output/collapse_angles/repose_angle_{angle}/data/nu_*.npy")
         files.sort()
         if i == 0:
@@ -45,34 +46,47 @@ for i, angle in enumerate(p.repose_angle):
 
         ax[0].plot(x, top, label=rf"$\varphi={angle}^\circ$", color=color)
 
-        max_L = W / np.tan(np.radians(angle))
-        min_L = 2.5 * p.dx
+        max_height = np.max(top)
+        min_height = np.min(top)
+        range_height = max_height - min_height
 
-        this_L = np.minimum(L, max_L)
-        this_L = np.maximum(this_L, min_L)
-        # print(f"angle={angle}, max_L={max_L}, this_L={this_L}")
+        left = top[: np.argmin(np.abs(top - max_height))]
 
-        fit_min_arg = np.argmin(np.abs(x + L_0 + this_L / 2.0))
-        fit_max_arg = np.argmin(np.abs(x + L_0 - this_L / 2.0))
-        x_fit = x[fit_min_arg:fit_max_arg]
+        if min_height == max_height:
+            coefficients = [0, min_height]
+            x_fit = x
+        elif angle == 90:
+            fit_max_arg = np.argmin(np.abs(top - max_height))
+            fit_min_arg = fit_max_arg - 1
 
-        # ax[0].plot(
-        #     x_fit,
-        #     (x_fit + L_0) * np.tan(np.radians(angle)) + top[np.argmin(np.abs(x + L_0))] + y_off,
-        #     # x[0:p.nx//4],
-        #     # np.linspace(0,W/4,p.nx//4)* np.tan(np.radians(angle)) + p.H/2.,
-        #     ls="-",
-        #     lw=0.5,
-        #     color=color,
-        # )
-        coefficients = np.polyfit(x_fit, top[fit_min_arg:fit_max_arg], 1)
-        # print(np.degrees(np.arctan(coefficients[0])))
+            x_fit = x[fit_min_arg : fit_max_arg + 1]
+            coefficients = np.polyfit(x_fit, top[fit_min_arg : fit_max_arg + 1], 1)
+        else:
+            N = 100
+            c = np.zeros((N, 2))
+            for i in range(N):
+                fit_min_arg = np.argmin(
+                    np.abs(left - (min_height + (0.1 + 0.2 * np.random.rand()) * range_height))
+                )
+                fit_max_arg = np.argmin(
+                    np.abs(left - (max_height - (0.1 + 0.2 * np.random.rand()) * range_height))
+                )
+
+                x_fit = x[fit_min_arg:fit_max_arg]
+
+                coefficients = np.polyfit(x_fit, top[fit_min_arg:fit_max_arg], 1)
+                c[i] = coefficients
+            coefficients = np.mean(c, axis=0)
+            stds = np.std(c, axis=0)
 
         ax[0].plot(x_fit, coefficients[0] * x_fit + coefficients[1], ls="--", lw=2, color=color)
+        if stds is None:
+            ax[1].plot(angle, np.degrees(np.arctan(coefficients[0])), "k.")
+        else:
+            ax[1].errorbar(
+                angle, np.degrees(np.arctan(coefficients[0])), yerr=np.degrees(np.arctan(stds[0])), fmt="k."
+            )
 
-        ax[1].plot(angle, np.degrees(np.arctan(coefficients[0])), "k.")
-        # ax[1].plot(np.tan(np.radians(angle)), coefficients[0], "k.")
-        # linear_fit = np.poly1d(coefficients)
     except IndexError:
         print(f"Missing file for repose angle={angle}")
     except ValueError:

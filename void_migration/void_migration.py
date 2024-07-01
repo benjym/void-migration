@@ -11,7 +11,7 @@ __version__ = "0.3"
 import sys
 import numpy as np
 import concurrent.futures
-from tqdm import tqdm
+from tqdm.auto import tqdm
 from itertools import product
 
 # from numba import jit, njit
@@ -54,21 +54,30 @@ def time_march(p):
         p.P_u_ref = stability
         p.dt = p.P_u_ref * p.dy / p.free_fall_velocity
 
-        p.P_lr_ref = p.diffusivity * p.dt / p.dy**2  # ignoring factor of 2 because gets called twice
+        p.P_lr_ref = p.diffusivity * p.dt / p.dy**2  # ignoring factor of 2 because that assumes P=0.5
         # p.P_lr_ref = p.alpha * p.P_u_ref
 
         p.P_u_max = p.P_u_ref * (p.s_M / p.s_m)
         p.P_lr_max = p.P_lr_ref * (p.s_M / p.s_m)
 
-        if p.P_u_max + 2 * p.P_lr_max <= 1:
-            safe = True
+        if p.vectorized:
+            if p.P_u_max <= 0.5 and p.P_lr_max <= 0.5:
+                safe = True
+            else:
+                stability *= 0.95
         else:
-            stability *= 0.95
+            if p.P_u_max + 2 * p.P_lr_max <= 1:
+                safe = True
+            else:
+                stability *= 0.95
 
     if p.charge_discharge:
         p.nt = cycles.set_nt(p)
     else:
         p.nt = int(np.ceil(p.t_f / p.dt))
+
+    if hasattr(p, "saves"):
+        p.save_inc = int(p.nt / p.saves)
 
     s = initial.IC(p)  # non-dimensional size
     u = np.zeros([p.nx, p.ny])
@@ -89,7 +98,8 @@ def time_march(p):
         T = None
 
     outlet = []
-    plotter.save_coordinate_system(x, y, p)
+    if len(p.save) > 0:
+        plotter.save_coordinate_system(x, y, p)
     plotter.update(x, y, s, u, v, c, T, outlet, p, t)
 
     N_swap = None
@@ -108,7 +118,10 @@ def time_march(p):
             p = cycles.charge_discharge(p, t)
             p_count[t], p_count_s[t], p_count_l[t], non_zero_nu_time[t] = cycles.save_quantities(p, s)
 
-        u, v, s, c, T, N_swap = motion.move_voids(u, v, s, p, c=c, T=T, N_swap=N_swap)
+        if p.vectorized:
+            u, v, s, c, T, N_swap = motion.move_voids_fast(u, v, s, p, c=c, T=T, N_swap=N_swap)
+        else:
+            u, v, s, c, T, N_swap = motion.move_voids(u, v, s, p, c=c, T=T, N_swap=N_swap)
 
         u, v, s, c, outlet = motion.add_voids(u, v, s, p, c, outlet)
 

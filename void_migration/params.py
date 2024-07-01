@@ -28,8 +28,12 @@ class dict_to_class:
             if not hasattr(self, key):
                 setattr(self, key, defaults_dict[key])
 
+        if not hasattr(self, "folderName"):
+            self.folderName = "output/"
+
         if not os.path.exists(self.folderName):
             os.makedirs(self.folderName)
+
         if len(self.save) > 0:
             if not os.path.exists(self.folderName + "data/"):
                 os.makedirs(self.folderName + "data/")
@@ -68,4 +72,5 @@ def load_file(f):
     if len(sys.argv) > 1:
         dict["input_filename"] = (sys.argv[1].split("/")[-1]).split(".")[0]
     p = dict_to_class(dict)
+    p.set_defaults()
     return dict, p

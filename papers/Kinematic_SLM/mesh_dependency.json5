@@ -6,10 +6,11 @@
     // paper version
     // nx : 100, // width
     
+    nm : 10,
     // geometry
     H : 1, // (m)
     aspect_ratio_y : 0.5,  // ny = aspect_ratio * nx
-    aspect_ratio_m : 1,    // nm = aspect_ratio * nx
+    // aspect_ratio_m : 1,    // nm = aspect_ratio * nx
 
     // material properties
     // repose_angle : [0,5,10,15,20,25,30,35,40,45], // (degrees)

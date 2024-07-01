@@ -4,6 +4,20 @@ from scipy.ndimage import maximum_filter
 import params
 import operators
 
+# from numba import njit
+
+
+def stable_slope_fast(s, dir, delta_limit):
+    dest = np.roll(s, dir, axis=0)
+    nu_here = operators.get_solid_fraction(s)
+    # nu_dest = operators.get_solid_fraction(dest)
+    nu_dest = np.roll(nu_here, dir, axis=0)
+    delta_nu = nu_dest - nu_here
+
+    stable = delta_nu <= delta_limit
+    Stable = np.repeat(stable[:, :, np.newaxis], s.shape[2], axis=2)
+    return Stable
+
 
 def stable_slope(s, i, j, dest, p):
     """
@@ -71,6 +85,106 @@ def empty_nearby(nu, p):
 
 
 # @njit
+def move_voids_fast(
+    u: ArrayLike,
+    v: ArrayLike,
+    s: ArrayLike,
+    p: params.dict_to_class,
+    diag: int = 0,
+    c: None | ArrayLike = None,
+    T: None | ArrayLike = None,
+    N_swap: None | ArrayLike = None,
+) -> tuple[ArrayLike, ArrayLike, ArrayLike, None | ArrayLike, None | ArrayLike]:
+    """
+    Function to move voids each timestep.
+
+    Args:
+        u: Storage container for counting how many voids moved horizontally
+        v: Storage container for counting how many voids moved vertically
+        s: 3D array containing the local sizes everywhere. `NaN`s represent voids. Other values represent the grain size. The first two dimensions represent real space, the third dimension represents the micro-structural coordinate.
+        diag: Should the voids swap horizontally (von neumnann neighbourhood, `diag=0`) or diagonally upwards (moore neighbourhood, `diag=1`). Default value `0`.
+        c: If ArrayLike, a storage container for tracking motion of differently labelled particles. If `None`, do nothing.
+        T: If ArrayLike, the temperature field. If `None`, do nothing.
+        boundary: If ArrayLike, a descriptor of cells which voids cannot move into (i.e. boundaries). If `internal_boundary` is defined in the params file, allow for reduced movement rates rather than zero. If `None`, do nothing.
+
+    Returns:
+        u: The updated horizontal velocity
+        v: The updated vertical velocity
+        s: The new locations of the grains
+        c: The updated concentration field
+        T: The updated temperature field
+    """
+
+    for axis, d in [(1, -1), (0, -1), (0, 1)]:  # up, left, right
+        nu = 1.0 - np.mean(np.isnan(s), axis=2)
+
+        solid = nu >= p.nu_cs
+        Solid = np.repeat(solid[:, :, np.newaxis], p.nm, axis=2)
+
+        unstable = np.isnan(s) * ~Solid  # & ~Skip
+
+        dest = np.roll(s, d, axis=axis)
+
+        if axis == 1:
+            s_inv_bar = operators.get_hyperbolic_average(s)
+            S_inv_bar = np.repeat(s_inv_bar[:, :, np.newaxis], p.nm, axis=2)
+            S = np.roll(S_inv_bar, d, axis=axis)
+            P = p.P_u_ref * (S / dest)
+
+            P[:, -1, :] = 0  # no swapping up from top row
+        elif axis == 0:
+            s_bar = operators.get_average(s)
+            S_bar = np.repeat(s_bar[:, :, np.newaxis], p.nm, axis=2)
+            S = np.roll(S_bar, d, axis=axis)
+            P = p.P_lr_ref * (dest / S)
+
+            if d == -1:  # left
+                P[0, :, :] = 0  # no swapping left from leftmost column
+            elif d == 1:  # right
+                P[-1, :, :] = 0  # no swapping right from rightmost column
+
+            slope_stable = stable_slope_fast(s, d, p.delta_limit)
+            P[slope_stable] = 0
+            # P *= stable_slope_fast(s, d, p.delta_limit)
+
+        swap_possible = unstable * ~np.isnan(dest)
+        P = np.where(swap_possible, P, 0)
+        swap = np.random.rand(*P.shape) < P
+
+        total_swap = np.sum(swap, axis=2, dtype=int)
+        max_swap = ((p.nu_cs - nu) * p.nm).astype(int)
+
+        overfilled = total_swap - max_swap
+        overfilled = np.maximum(overfilled, 0)
+
+        for i in range(p.nx):
+            for j in range(p.ny):
+                if overfilled[i, j] > 0:
+                    swap_args = np.argwhere(swap[i, j, :]).flatten()
+                    over_indices = np.random.choice(swap_args, size=overfilled[i, j], replace=False)
+                    swap[i, j, over_indices] = False
+
+        swap_indices = np.argwhere(swap)
+        dest_indices = swap_indices.copy()
+        dest_indices[:, axis] -= d
+
+        if axis == 1:
+            v[swap_indices[:, 0], swap_indices[:, 1]] += d
+        elif axis == 0:
+            u[swap_indices[:, 0], swap_indices[:, 1]] += d
+
+        (
+            s[swap_indices[:, 0], swap_indices[:, 1], swap_indices[:, 2]],
+            s[dest_indices[:, 0], dest_indices[:, 1], dest_indices[:, 2]],
+        ) = (
+            s[dest_indices[:, 0], dest_indices[:, 1], dest_indices[:, 2]],
+            s[swap_indices[:, 0], swap_indices[:, 1], swap_indices[:, 2]],
+        )
+
+    return u, v, s, c, T, N_swap
+
+
+# @njit
 def move_voids(
     u: ArrayLike,
     v: ArrayLike,
@@ -125,7 +239,7 @@ def move_voids(
 
     # N_swap = np.ones_like(s[:, :, 0]) # HACK - SET NON-ZERO Tg EVERYWHERE FOR TESTING
 
-    nu = 1.0 - np.mean(np.isnan(s[:, :, :]), axis=2)
+    nu = 1.0 - np.mean(np.isnan(s), axis=2)
 
     skip = empty_nearby(nu, p)
 
@@ -134,17 +248,10 @@ def move_voids(
 
     for index in p.indices:
         i, j, k = np.unravel_index(index, [p.nx, p.ny - 1, p.nm])
-        # if ( nu[i, j] < p.nu_cs ):
-        # if (nu[i, j] < p.nu_cs) and nu_max[i, j] > 0:  # skip any areas where it is all voids
+
         if not skip[i, j]:
             if np.isnan(s[i, j, k]):
                 if not locally_solid(s, i, j, p):
-                    # print(s_inv_bar[i,j])
-
-                    # t_p = dy/sqrt(g*(H-y[j])) # local confinement timescale (s)
-
-                    # if np.random.rand() < p.free_fall_velocity*p.dt/p.dy:
-
                     # UP
                     if np.isnan(s[i, j + 1, k]):
                         P_u = 0
@@ -205,7 +312,6 @@ def move_voids(
                         P = np.random.rand()
                         if P < P_u and P_u > 0:  # go up
                             dest = [i, j + 1, k]
-                            # v[i, j] += 1
                             if not np.isnan(s[i, j + 1, k]):
                                 v[i, j] += 1
                         elif P < (P_l + P_u):  # go left
@@ -228,7 +334,6 @@ def move_voids(
                                 v[i, j] += np.sqrt(2)
                         else:
                             pass
-                            # print('NOTHING')
 
                         if dest is not None:
                             [s, c, T], nu = operators.swap([i, j, k], dest, [s, c, T], nu, p)
