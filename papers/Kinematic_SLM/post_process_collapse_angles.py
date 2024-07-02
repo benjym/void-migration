@@ -27,6 +27,7 @@ fig = plt.figure(figsize=[3.31894680556, 3])
 ax = fig.subplots(2, 1)
 
 for i, angle in enumerate(p.repose_angle):
+    print(angle)
     try:
         stds = None
         files = glob(f"output/collapse_angles/repose_angle_{angle}/data/nu_*.npy")
@@ -52,7 +53,7 @@ for i, angle in enumerate(p.repose_angle):
 
         left = top[: np.argmin(np.abs(top - max_height))]
 
-        if min_height == max_height:
+        if angle == 0:
             coefficients = [0, min_height]
             x_fit = x
         elif angle == 90:

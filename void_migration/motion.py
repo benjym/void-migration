@@ -138,9 +138,9 @@ def move_voids_fast(
             S = np.roll(S_bar, d, axis=axis)
             P = p.P_lr_ref * (dest / S)
 
-            if d == -1:  # left
+            if d == 1:  # left
                 P[0, :, :] = 0  # no swapping left from leftmost column
-            elif d == 1:  # right
+            elif d == -1:  # right
                 P[-1, :, :] = 0  # no swapping right from rightmost column
 
             slope_stable = stable_slope_fast(s, d, p.delta_limit)
