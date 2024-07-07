@@ -7,9 +7,9 @@ import matplotlib.cm as cm
 import matplotlib.colors as colors
 from void_migration.params import load_file
 
-plt.style.use("papers/Kinematic_SLM/paper.mplstyle")
+plt.style.use("papers/Kinematic_SLM/post_process/paper.mplstyle")
 
-with open("papers/Kinematic_SLM/collapse_angles.json5") as f:
+with open("papers/Kinematic_SLM/json/collapse_angles.json5") as f:
     dict, p = load_file(f)
 
 W = p.H * (p.nx / p.ny)
@@ -26,21 +26,26 @@ cmap = colormaps["inferno"]
 fig = plt.figure(figsize=[3.31894680556, 3])
 ax = fig.subplots(2, 1)
 
+fig2 = plt.figure(figsize=[3.31894680556, 3])
+ax2 = fig2.subplots(1, 1)
+
 for i, angle in enumerate(p.repose_angle):
-    print(angle)
     try:
-        stds = None
         files = glob(f"output/collapse_angles/repose_angle_{angle}/data/nu_*.npy")
         files.sort()
         if i == 0:
             data = np.load(files[0])
             bw = data >= p.nu_cs / 2.0
+            # bw = data > 0
+            # bw = data >= p.nu_cs
             top = np.argmin(bw, axis=1) * p.H / p.ny
 
-            ax[0].plot(x, top, label="Initial", color="k", ls="--")
+            ax[0].plot(x, top, label="Initial", color="blue", ls="-", lw=3)
 
         data = np.load(files[-1])
         bw = data >= p.nu_cs / 2.0
+        # bw = data > 0
+        # bw = data >= p.nu_cs
         top = np.argmin(bw, axis=1) * p.H / p.ny
 
         color = cmap(i / (len(p.repose_angle) - 1))
@@ -63,35 +68,24 @@ for i, angle in enumerate(p.repose_angle):
             x_fit = x[fit_min_arg : fit_max_arg + 1]
             coefficients = np.polyfit(x_fit, top[fit_min_arg : fit_max_arg + 1], 1)
         else:
-            N = 100
-            c = np.zeros((N, 2))
-            for i in range(N):
-                fit_min_arg = np.argmin(
-                    np.abs(left - (min_height + (0.1 + 0.2 * np.random.rand()) * range_height))
-                )
-                fit_max_arg = np.argmin(
-                    np.abs(left - (max_height - (0.1 + 0.2 * np.random.rand()) * range_height))
-                )
+            fit_min_arg = np.argmin(np.abs(left - (min_height + range_height / 4.0)))
+            fit_max_arg = np.argmin(np.abs(left - (max_height - range_height / 4.0)))
 
-                x_fit = x[fit_min_arg:fit_max_arg]
+            x_fit = x[fit_min_arg:fit_max_arg]
 
-                coefficients = np.polyfit(x_fit, top[fit_min_arg:fit_max_arg], 1)
-                c[i] = coefficients
-            coefficients = np.mean(c, axis=0)
-            stds = np.std(c, axis=0)
+            coefficients = np.polyfit(x_fit, top[fit_min_arg:fit_max_arg], 1)
 
         ax[0].plot(x_fit, coefficients[0] * x_fit + coefficients[1], ls="--", lw=2, color=color)
-        if stds is None:
-            ax[1].plot(angle, np.degrees(np.arctan(coefficients[0])), "k.")
-        else:
-            ax[1].errorbar(
-                angle, np.degrees(np.arctan(coefficients[0])), yerr=np.degrees(np.arctan(stds[0])), fmt="k."
-            )
+        ax[1].plot(angle, np.degrees(np.arctan(coefficients[0])), "k.")
+
+        ax2.plot(p.delta_limit[i] / p.nu_cs, np.degrees(np.arctan(coefficients[0])), "k.")
 
     except IndexError:
         print(f"Missing file for repose angle={angle}")
-    except ValueError:
-        print(f"Old data file for repose angle={angle}")
+    # except ValueError:
+    # print(f"Old data file for repose angle={angle}")
+    except TypeError:
+        print(f"TypeError for repose angle={angle}")
 
 
 plt.sca(ax[0])
@@ -135,3 +129,14 @@ plt.ylim([0, 90])
 
 plt.subplots_adjust(left=0.2, bottom=0.15, right=0.97, top=0.97, hspace=0.4)
 plt.savefig(os.path.expanduser("~/Dropbox/Apps/Overleaf/Kinematic SLM/im/collapse_angle.pdf"))
+
+plt.sca(ax2)
+phi = np.linspace(0, 90, 100)
+mu = np.tan(np.radians(phi))
+delta_nu = 1 / (1 / mu + 1)
+plt.plot(delta_nu, phi, "k-")
+plt.xlabel(r"$\Delta\nu/\nu_{cs}$")
+plt.ylabel("Measured angle of repose\n(degrees)")
+plt.subplots_adjust(left=0.2, bottom=0.15, right=0.97, top=0.97, hspace=0.4)
+plt.savefig(os.path.expanduser("~/Dropbox/Apps/Overleaf/Kinematic SLM/im/collapse_angle_delta_limit.pdf"))
+# plt.show()

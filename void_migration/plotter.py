@@ -69,6 +69,19 @@ inferno_r.set_bad("w", 0.0)
 
 global fig, summary_fig
 
+replacements = {
+    "repose_angle": "φ",
+    "mu": "μ",
+    "nu_cs": "ν_cs",
+    "alpha": "α",
+}
+
+
+def replace_strings(text, replacements):
+    for old, new in replacements.items():
+        text = text.replace(old, new)
+    return text
+
 
 def set_plot_size(p):
     global fig, summary_fig
@@ -103,6 +116,8 @@ def update(x, y, s, u, v, c, T, outlet, p, t, *args):
         plot_permeability(x, y, s, p, t)
     if "stable" in p.plot:
         plot_stable(x, y, s, p, t)
+    if "h" in p.plot:
+        plot_h(x, y, s, p, t)
 
     if "s" in p.save:
         save_s(x, y, s, p, t)
@@ -463,10 +478,46 @@ def plot_T(x, y, s, T, p, t):
     plt.savefig(p.folderName + "T_" + str(t).zfill(6) + ".png")
 
 
+def plot_h(x, y, s, p, t):
+    """
+    Show the relative 'height' of the grains in each cell. Used for diagnostic purposes only, otherwise not that useful.
+    """
+    plt.figure(fig)
+    nu = 1 - np.mean(np.isnan(s), axis=2)
+    h = nu / p.nu_cs
+
+    plt.clf()
+    ax = plt.gca()
+
+    # Loop through each value in the 2D array and create a rectangle
+    for i in range(h.shape[0]):
+        for j in range(h.shape[1]):
+            # Create a rectangle
+            rect = plt.Rectangle((i, j), 1, h[i, j], color="k", alpha=1)
+
+            # Add the rectangle to the plot
+            ax.add_patch(rect)
+
+    # Set the limits of the plot to fit all rectangles
+    ax.set_xlim(0, h.shape[0])
+    ax.set_ylim(0, h.shape[1])
+
+    # Display the plot
+    # plt.gca().invert_yaxis() # Optional: to invert the y-axis to match array indexing
+    # plt.show()
+
+    plt.axis("off")
+    plt.xlim(0, h.shape[0])
+    plt.ylim(0, h.shape[1])
+    plt.subplots_adjust(left=0, right=1, bottom=0, top=1)
+    plt.savefig(p.folderName + "h_" + str(t).zfill(6) + ".png", dpi=100)
+
+
 def make_video(p):
     if is_ffmpeg_installed:
         fname = p.folderName.split("/")[-2]
         nice_name = "=".join(fname.rsplit("_", 1))
+        nice_name = replace_strings(nice_name, replacements)
         subtitle = f"drawtext=text='{nice_name}':x=(w-text_w)/2:y=H-th-10:fontsize=10:fontcolor=white:box=1:boxcolor=black@0.5"
         # fps = p.save_inc / p.dt
         # print(f"Making video at {fps} fps, {p.save_inc} frames per cycle, {p.dt} s per frame")

@@ -16,20 +16,21 @@ for i, phi in enumerate(phis):
 
     delta_nu = 1 / (1 / mu + 1)
     Ms = np.logspace(1, 3, 100)
-    delta_mus = []
+    delta_phis = []
 
     for M in Ms:
-        delta_mu = 1 / (1 / (delta_nu + 1.0 / (M / 2.0)) - 1) - 1 / (1 / delta_nu - 1)
-        delta_mus.append(delta_mu)
+        mu_eff = 1 / (1 / (delta_nu + 1.0 / (2 * M)) - 1)
+        delta_phi = np.degrees(np.arctan(mu_eff)) - np.degrees(np.arctan(mu))
+        delta_phis.append(delta_phi)
 
-    delta_phi = np.degrees(np.arctan(delta_mus))
+    # delta_phi = np.degrees(np.arctan(delta_mus))
     color = cmap(i / (len(phis) - 1))
 
-    plt.loglog(Ms, delta_phi, label=rf"$\varphi={phi:0.0f}^\circ$", c=color)
+    plt.loglog(Ms, delta_phis, label=rf"$\varphi={phi:0.0f}^\circ$", c=color)
 plt.xlabel("M")
 # plt.ylabel(r'$\Delta\mu$')
-plt.ylabel(rf"$\Delta\varphi$ ($^\circ$)")
-plt.yticks([0.1, 1, 10, 100])
+plt.ylabel(r"$\Delta\varphi$ ($^\circ$)")
+# plt.yticks([0.1, 1, 10, 100])
 plt.legend(
     # loc=0,
     loc="upper right",
@@ -39,3 +40,18 @@ plt.legend(
 )
 plt.subplots_adjust(left=0.2, right=0.99, top=0.95, bottom=0.2)
 plt.savefig(os.path.expanduser("~/Dropbox/Apps/Overleaf/Kinematic SLM/im/discretisation_error.pdf"))
+
+plt.clf()
+M = 100
+delta_M = 1.0 / M
+for m in range(1, M):
+    # if m == 1:
+    # psi = 90
+    # else:
+    delta_nu = m * delta_M
+    mu = 1 / (1 / delta_nu - 1)
+    psi = np.degrees(np.arctan(mu))
+    plt.plot(delta_nu, psi, "k.")
+plt.xlabel(r"$\Delta\nu$")
+plt.ylabel(r"$\psi$ ($^\circ$)")
+plt.savefig(os.path.expanduser("~/Dropbox/Apps/Overleaf/Kinematic SLM/im/possible_values.pdf"))

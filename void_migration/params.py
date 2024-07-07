@@ -63,7 +63,13 @@ class dict_to_class:
 
         with np.errstate(divide="ignore", invalid="ignore"):
             inv_mu = np.nan_to_num(1.0 / self.mu, nan=0.0, posinf=1e30, neginf=0.0)
-        self.delta_limit = self.nu_cs / (inv_mu + 1)
+        self.delta_limit = self.nu_cs / (inv_mu + 1)  # BIT TOO LOW — ACTUALLY PRETTY GOOD FOR nx = 40
+        # self.delta_limit = 1 / (inv_mu + 1) # WAY TOO HIGH
+        # self.delta_limit = 1 / (self.nu_cs*inv_mu + 1) # WAY TOO HIGH
+        # self.delta_limit = 1 / (inv_mu/self.nu_cs + 1) # not bad! bit too high
+        # self.delta_limit = self.nu_cs / (inv_mu/self.nu_cs + 1) # way too low
+        # print(self.repose_angle)
+        # self.delta_limit = self.nu_cs / (inv_mu*self.nu_cs + 1) # Works well for mu > 1, too high for mu < 1 ???
 
 
 def load_file(f):

@@ -8,7 +8,7 @@ import operators
 
 
 def stable_slope_fast(s, dir, delta_limit):
-    dest = np.roll(s, dir, axis=0)
+    # dest = np.roll(s, dir, axis=0)
     nu_here = operators.get_solid_fraction(s)
     # nu_dest = operators.get_solid_fraction(dest)
     nu_dest = np.roll(nu_here, dir, axis=0)
