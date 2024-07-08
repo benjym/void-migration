@@ -28,10 +28,10 @@ ax = fig.subplots(2, 1)
 fig2 = plt.figure(figsize=[3.31894680556, 3])
 ax2 = fig2.subplots(1, 1)
 
-for j, nm in enumerate(p.nm):
+for j, P_stab in enumerate(p.P_stab):
     for i, angle in enumerate(p.repose_angle):
         try:
-            files = glob(f"output/test_slope/nm_{nm}/repose_angle_{angle}/data/nu_*.npy")
+            files = glob(f"output/test_slope/repose_angle_{angle}/P_stab_{P_stab}/data/nu_*.npy")
 
             files.sort()
             if i == 0:
@@ -80,19 +80,19 @@ for j, nm in enumerate(p.nm):
 
             ax[0].plot(x_fit, coefficients[0] * x_fit + coefficients[1], ls="--", lw=2, color=color)
 
-            color = cmap(j / (len(p.nm) - 1))
-            ax[1].plot(angle, np.degrees(np.arctan(coefficients[0])), ".", mec=color, mfc=color)
+            color = cmap(j / (len(p.P_stab) - 1))
+            ax[1].plot(angle, np.degrees(np.arctan(coefficients[0])), "x", mec=color, mfc=color)
 
             ax2.plot(
-                p.delta_limit[i] / p.nu_cs, np.degrees(np.arctan(coefficients[0])), ".", mec=color, mfc=color
+                p.delta_limit[i] / p.nu_cs, np.degrees(np.arctan(coefficients[0])), "x", mec=color, mfc=color
             )
 
         except IndexError:
-            print(f"Missing file for repose angle={angle}")
+            print(f"Missing file for repose angle={angle}, P_stab={P_stab}")
         except ValueError:
-            print(f"Old data file for repose angle={angle}")
+            print(f"Old data file for repose angle={angle}, P_stab={P_stab}")
         except TypeError:
-            print(f"TypeError for repose angle={angle}")
+            print(f"TypeError for repose angle={angle}, P_stab={P_stab}")
 
 plt.sca(ax[1])
 plt.plot([0, 90], [0, 90], "k--")

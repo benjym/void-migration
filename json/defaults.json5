@@ -3,7 +3,8 @@
     nx : 10, // number of cells horizontally
     ny : 10, // number of cells vertically
     nm : 10,  // number of cells in internal direction
-    // aspect_ratio : 1, // ratio of horizontal to vertical resolution, if defined, overrides ny
+    P_stab : 0.5, // maximum probability to allow for stability
+
 
     // geometry
     H : 1, // physical height of the system (m)

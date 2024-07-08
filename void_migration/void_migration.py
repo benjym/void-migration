@@ -30,54 +30,7 @@ def time_march(p):
 
     plotter.set_plot_size(p)
 
-    y = np.linspace(0, p.H, p.ny)
-    p.dy = y[1] - y[0]
-    x = np.arange(-(p.nx - 0.5) / 2 * p.dy, (p.nx - 0.5) / 2 * p.dy, p.dy)  # force equal grid spacing
-    p.dx = x[1] - x[0]
-    if not np.isclose(p.dx, p.dy):
-        print(f"dx = {p.dx}, dy = {p.dy}")
-        sys.exit("Fatal error: dx != dy")
-
-    X, Y = np.meshgrid(x, y, indexing="ij")
-
-    y += p.dy / 2.0
-    t = 0
-
-    # p.t_p = p.s_m / np.sqrt(p.g * p.H)  # smallest confinement timescale (at bottom) (s)
-    s_bar = (p.s_m + p.s_M) / 2.0  # mean diameter (m)
-    p.free_fall_velocity = np.sqrt(p.g * s_bar)  # time to fall one mean diameter (s)
-    p.diffusivity = p.alpha * p.free_fall_velocity * s_bar  # diffusivity (m^2/s)
-
-    safe = False
-    stability = 0.5
-    while not safe:
-        p.P_u_ref = stability
-        p.dt = p.P_u_ref * p.dy / p.free_fall_velocity
-
-        p.P_lr_ref = p.diffusivity * p.dt / p.dy**2  # ignoring factor of 2 because that assumes P=0.5
-        # p.P_lr_ref = p.alpha * p.P_u_ref
-
-        p.P_u_max = p.P_u_ref * (p.s_M / p.s_m)
-        p.P_lr_max = p.P_lr_ref * (p.s_M / p.s_m)
-
-        if p.vectorized:
-            if p.P_u_max <= 0.5 and p.P_lr_max <= 0.5:
-                safe = True
-            else:
-                stability *= 0.95
-        else:
-            if p.P_u_max + 2 * p.P_lr_max <= 1:
-                safe = True
-            else:
-                stability *= 0.95
-
-    if p.charge_discharge:
-        p.nt = cycles.set_nt(p)
-    else:
-        p.nt = int(np.ceil(p.t_f / p.dt))
-
-    if hasattr(p, "saves"):
-        p.save_inc = int(p.nt / p.saves)
+    p = params.update_before_time_march(p, cycles)
 
     s = initial.IC(p)  # non-dimensional size
     u = np.zeros([p.nx, p.ny])
@@ -87,9 +40,9 @@ def time_march(p):
     p_count_l = np.zeros([p.nt])
     non_zero_nu_time = np.zeros([p.nt])
 
-    c = initial.set_concentration(s, X, Y, p)
+    c = initial.set_concentration(s, p.X, p.Y, p)
 
-    initial.set_boundary(s, X, Y, p)
+    initial.set_boundary(s, p.X, p.Y, p)
 
     if hasattr(p, "temperature"):
         T = p.temperature["inlet_temperature"] * np.ones_like(s)
@@ -99,8 +52,8 @@ def time_march(p):
 
     outlet = []
     if len(p.save) > 0:
-        plotter.save_coordinate_system(x, y, p)
-    plotter.update(x, y, s, u, v, c, T, outlet, p, t)
+        plotter.save_coordinate_system(p.x, p.y, p)
+    plotter.update(p.x, p.y, s, u, v, c, T, outlet, p, 0)
 
     N_swap = None
     p.indices = np.arange(p.nx * (p.ny - 1) * p.nm)
@@ -129,11 +82,9 @@ def time_march(p):
             u, v, s = motion.close_voids(u, v, s)
 
         if t % p.save_inc == 0:
-            plotter.update(x, y, s, u, v, c, T, outlet, p, t)
+            plotter.update(p.x, p.y, s, u, v, c, T, outlet, p, t)
 
-        t += 1
-
-    plotter.update(x, y, s, u, v, c, T, outlet, p, t)
+    plotter.update(p.x, p.y, s, u, v, c, T, outlet, p, t)
 
 
 def run_simulation(sim_with_index):

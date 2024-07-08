@@ -1,23 +1,26 @@
 {
     // resolution
     // testing
-    nx : 100, // width
-    ny : 50, // height
-    nm : [20,40,80,160,320],
+    nx : 50, // width
+    ny : 25, // height
+    // nm : [20,40,80,160,320],
+    nm : 25,
 
     // geometry
     H : 1, // (m)
     
     // material properties
     // repose_angle : [0,5,10,15,20,25,30,35,40,45,50,55,60,65,70,75,80,85,90], // (degrees)
-    repose_angle : [0,10,20,30,40,50,60,70,80,90], // (degrees)
+    // repose_angle : [0,10,20,30,40,50,60,70,80,90], // (degrees)
     // repose_angle : [0,25,50,75,90], // (degrees)
+    repose_angle : [30,70], // (degrees)
     gsd_mode : 'mono',
     s_m : 0.01, // minimum particle size (m)
     s_M : 0.01, // maximum particle size (m)
     // nu_cs : [0.3,0.5,0.7],
     nu_cs : 0.5,
     alpha : 1,
+    P_stab : [0.5,0.2,0.1,0.05,0.02,0.01],
     
     // initial condition:
     fill_ratio : 0.25,

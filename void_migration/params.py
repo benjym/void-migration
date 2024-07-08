@@ -60,6 +60,9 @@ class dict_to_class:
             self.repose_angle = np.degrees(np.arctan(self.mu))
         if hasattr(self, "repose_angle"):
             self.mu = np.tan(np.radians(self.repose_angle))
+        # print(self.mu)
+        # print(self.repose_angle)
+        # sys.exit()
 
         with np.errstate(divide="ignore", invalid="ignore"):
             inv_mu = np.nan_to_num(1.0 / self.mu, nan=0.0, posinf=1e30, neginf=0.0)
@@ -80,3 +83,55 @@ def load_file(f):
     p = dict_to_class(dict)
     p.set_defaults()
     return dict, p
+
+
+def update_before_time_march(p, cycles):
+    p.y = np.linspace(0, p.H, p.ny)
+    p.dy = p.y[1] - p.y[0]
+    p.x = np.arange(-(p.nx - 0.5) / 2 * p.dy, (p.nx - 0.5) / 2 * p.dy, p.dy)  # force equal grid spacing
+    p.dx = p.x[1] - p.x[0]
+    if not np.isclose(p.dx, p.dy):
+        sys.exit(f"Fatal error: dx != dy. dx = {p.dx}, dy = {p.dy}")
+
+    p.X, p.Y = np.meshgrid(p.x, p.y, indexing="ij")
+
+    p.y += p.dy / 2.0
+    p.t = 0
+
+    # p.t_p = p.s_m / np.sqrt(p.g * p.H)  # smallest confinement timescale (at bottom) (s)
+    s_bar = (p.s_m + p.s_M) / 2.0  # mean diameter (m)
+    p.free_fall_velocity = np.sqrt(p.g * s_bar)  # time to fall one mean diameter (s)
+    p.diffusivity = p.alpha * p.free_fall_velocity * s_bar  # diffusivity (m^2/s)
+
+    safe = False
+    stability = 0.5
+    while not safe:
+        p.P_u_ref = stability
+        p.dt = p.P_u_ref * p.dy / p.free_fall_velocity
+
+        p.P_lr_ref = p.diffusivity * p.dt / p.dy**2  # ignoring factor of 2 because that assumes P=0.5
+        # p.P_lr_ref = p.alpha * p.P_u_ref
+
+        p.P_u_max = p.P_u_ref * (p.s_M / p.s_m)
+        p.P_lr_max = p.P_lr_ref * (p.s_M / p.s_m)
+
+        if p.vectorized:
+            if p.P_u_max <= p.P_stab and p.P_lr_max <= p.P_stab:
+                safe = True
+            else:
+                stability *= 0.95
+        else:
+            if p.P_u_max + 2 * p.P_lr_max <= p.P_stab:
+                safe = True
+            else:
+                stability *= 0.95
+
+    if p.charge_discharge:
+        p.nt = cycles.set_nt(p)
+    else:
+        p.nt = int(np.ceil(p.t_f / p.dt))
+
+    if hasattr(p, "saves"):
+        p.save_inc = int(p.nt / p.saves)
+
+    return p
