@@ -21,6 +21,7 @@ import thermal
 import motion
 import cycles
 import initial
+import stress
 
 
 def time_march(p):
@@ -50,10 +51,15 @@ def time_march(p):
     else:
         T = None
 
+    if p.calculate_stress:
+        sigma = stress.calculate_stress(s, p)
+    else:
+        sigma = None
+
     outlet = []
     if len(p.save) > 0:
         plotter.save_coordinate_system(p.x, p.y, p)
-    plotter.update(p.x, p.y, s, u, v, c, T, outlet, p, 0)
+    plotter.update(p.x, p.y, s, u, v, c, T, sigma, outlet, p, 0)
 
     N_swap = None
     p.indices = np.arange(p.nx * (p.ny - 1) * p.nm)
@@ -67,12 +73,15 @@ def time_march(p):
         if hasattr(p, "temperature"):
             T = thermal.update_temperature(s, T, p)
 
+        if p.calculate_stress:
+            sigma = stress.calculate_stress(s, p)
+
         if p.charge_discharge:
             p = cycles.charge_discharge(p, t)
             p_count[t], p_count_s[t], p_count_l[t], non_zero_nu_time[t] = cycles.save_quantities(p, s)
 
         if p.vectorized:
-            u, v, s, c, T, N_swap = motion.move_voids_fast(u, v, s, p, c=c, T=T, N_swap=N_swap)
+            u, v, s, c, T, N_swap = motion.move_voids_fast(u, v, s, sigma, p, c=c, T=T, N_swap=N_swap)
         else:
             u, v, s, c, T, N_swap = motion.move_voids(u, v, s, p, c=c, T=T, N_swap=N_swap)
 
@@ -82,9 +91,9 @@ def time_march(p):
             u, v, s = motion.close_voids(u, v, s)
 
         if t % p.save_inc == 0:
-            plotter.update(p.x, p.y, s, u, v, c, T, outlet, p, t)
+            plotter.update(p.x, p.y, s, u, v, c, T, sigma, outlet, p, t)
 
-    plotter.update(p.x, p.y, s, u, v, c, T, outlet, p, t)
+    plotter.update(p.x, p.y, s, u, v, c, T, sigma, outlet, p, t)
 
 
 def run_simulation(sim_with_index):

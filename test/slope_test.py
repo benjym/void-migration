@@ -1,11 +1,13 @@
-import os
-from glob import glob
+# import os
+# from glob import glob
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib import colormaps
-import matplotlib.cm as cm
-import matplotlib.colors as colors
-from void_migration.params import load_file
+
+# import matplotlib.cm as cm
+# import matplotlib.colors as colors
+import void_migration.cycles as cycles
+from void_migration.params import load_file, dict_to_class, update_before_time_march
 
 plt.style.use("papers/Kinematic_SLM/post_process/paper.mplstyle")
 
@@ -28,14 +30,24 @@ ax = fig.subplots(2, 1)
 fig2 = plt.figure(figsize=[3.31894680556, 3])
 ax2 = fig2.subplots(1, 1)
 
-for j, P_stab in enumerate(p.P_stab):
-    for i, angle in enumerate(p.repose_angle):
-        try:
-            files = glob(f"output/test_slope/repose_angle_{angle}/P_stab_{P_stab}/data/nu_*.npy")
+var1 = "repose_angle"
+var2 = "P_stab"
 
-            files.sort()
+for j, b in enumerate(getattr(p, var2)):
+    for i, a in enumerate(getattr(p, var1)):
+        dict_copy = dict.copy()
+        dict_copy[var1] = a
+        dict_copy[var2] = b
+        this_p = dict_to_class(dict_copy)
+        this_p.set_defaults()
+        this_p = update_before_time_march(this_p, cycles)
+
+        try:
+            # init = f"output/test_slope/repose_angle_{angle}/P_stab_{P_stab}/data/nu_000000.npy"
+            init = f"output/test_slope/{var1}_{a}/{var2}_{b}/data/nu_" + str(0).zfill(6) + ".npy"
+            final = f"output/test_slope/{var1}_{a}/{var2}_{b}/data/nu_" + str(this_p.nt - 1).zfill(6) + ".npy"
             if i == 0:
-                data = np.load(files[0])
+                data = np.load(init)
                 bw = data >= p.nu_cs / 2.0
                 # bw = data > 0
                 # bw = data >= p.nu_cs
@@ -43,15 +55,21 @@ for j, P_stab in enumerate(p.P_stab):
 
                 ax[0].plot(x, top, label="Initial", color="blue", ls="-", lw=3)
 
-            data = np.load(files[-1])
+            # if not os.path.exists(final):
+            #     print(f"Missing final file for repose angle={angle}, P_stab={P_stab}. Using most recent file.")
+            #     files = glob(f"output/test_slope/repose_angle_{angle}/P_stab_{P_stab}/data/nu_*.npy")
+            #     files.sort()
+            #     final = files[-1]
+
+            data = np.load(final)
             bw = data >= p.nu_cs / 2.0
             # bw = data > 0
             # bw = data >= p.nu_cs
             top = np.argmin(bw, axis=1) * p.H / p.ny
 
-            color = cmap(i / (len(p.repose_angle) - 1))
+            color = cmap(i / (len(getattr(p, var1)) - 1))
 
-            ax[0].plot(x, top, label=rf"$\varphi={angle}^\circ$", color=color)
+            ax[0].plot(x, top, label=rf"$\varphi={a}^\circ$", color=color)
             # plt.show()
 
             max_height = np.max(top)
@@ -67,7 +85,7 @@ for j, P_stab in enumerate(p.P_stab):
             if fit_min_arg == fit_max_arg:
                 coefficients = [0, min_height]
                 x_fit = x
-            elif angle == 90:
+            elif a == 90:
                 fit_max_arg = np.argmin(np.abs(top - max_height))
                 fit_min_arg = fit_max_arg - 1
 
@@ -80,19 +98,21 @@ for j, P_stab in enumerate(p.P_stab):
 
             ax[0].plot(x_fit, coefficients[0] * x_fit + coefficients[1], ls="--", lw=2, color=color)
 
-            color = cmap(j / (len(p.P_stab) - 1))
-            ax[1].plot(angle, np.degrees(np.arctan(coefficients[0])), "x", mec=color, mfc=color)
+            color = cmap(j / (len(getattr(p, var2)) - 1))
+            ax[1].plot(a, np.degrees(np.arctan(coefficients[0])), "x", mec=color, mfc=color)
 
             ax2.plot(
                 p.delta_limit[i] / p.nu_cs, np.degrees(np.arctan(coefficients[0])), "x", mec=color, mfc=color
             )
 
         except IndexError:
-            print(f"Missing file for repose angle={angle}, P_stab={P_stab}")
+            print(f"Missing file for {var1}={a}, {var2}={b}")
         except ValueError:
-            print(f"Old data file for repose angle={angle}, P_stab={P_stab}")
-        except TypeError:
-            print(f"TypeError for repose angle={angle}, P_stab={P_stab}")
+            print(f"Old data file for {var1}={a}, {var2}={b}")
+        # except TypeError:
+        # print(f"TypeError for {var1}={a}, {var2}={b}")
+        except FileNotFoundError:
+            print(f"FileNotFoundError for {var1}={a}, {var2}={b}")
 
 plt.sca(ax[1])
 plt.plot([0, 90], [0, 90], "k--")

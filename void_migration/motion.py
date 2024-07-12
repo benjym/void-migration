@@ -89,6 +89,7 @@ def move_voids_fast(
     u: ArrayLike,
     v: ArrayLike,
     s: ArrayLike,
+    sigma: ArrayLike,
     p: params.dict_to_class,
     diag: int = 0,
     c: None | ArrayLike = None,
@@ -145,7 +146,10 @@ def move_voids_fast(
 
             slope_stable = stable_slope_fast(s, d, p.delta_limit)
             P[slope_stable] = 0
-            # P *= stable_slope_fast(s, d, p.delta_limit)
+
+            # m = p.mu > sigma[:, :, 2]  # stable where mobilised less than critical
+            # slope_stable = np.repeat(m[:, :, np.newaxis], p.nm, axis=2)
+            # P[slope_stable] = 0
 
         swap_possible = unstable * ~np.isnan(dest)
         P = np.where(swap_possible, P, 0)
@@ -161,8 +165,9 @@ def move_voids_fast(
             for j in range(p.ny):
                 if overfilled[i, j] > 0:
                     swap_args = np.argwhere(swap[i, j, :]).flatten()
-                    over_indices = np.random.choice(swap_args, size=overfilled[i, j], replace=False)
-                    swap[i, j, over_indices] = False
+                    if len(swap_args) > 0:
+                        over_indices = np.random.choice(swap_args, size=overfilled[i, j], replace=False)
+                        swap[i, j, over_indices] = False
 
         swap_indices = np.argwhere(swap)
         dest_indices = swap_indices.copy()
@@ -420,18 +425,49 @@ def add_voids(u, v, s, p, c, outlet):
                     #     if np.isnan(s[i, -1, k]):
                     #         v[i, :] += 1  # np.isnan(s[i,:,k])
                     #         s[i, :, k] = np.roll(s[i, :, k], 1)
-    elif p.add_voids == "mara":  # Add voids at base
+    elif p.add_voids == "vibro_first":  # Add voids at base
+        # for i in range(5,nx-5):
+
+        for i in range(p.nx):
+            for k in range(p.nm):
+                if not np.isnan(s[i, 0, k]):
+                    if (
+                        np.random.rand() < p.void_production_rate * p.dt / p.dy
+                        and np.sum(np.isnan(s[i, :, k])) > 0
+                    ):
+                        # possible_sites = np.isnan(s[i, :, k]) * (nu[i, :] < p.nu_cs)
+                        nu = 1.0 - np.mean(np.isnan(s), axis=2)
+                        possible_sites = nu[i, :] < p.nu_cs
+                        print(possible_sites)
+                        if np.sum(possible_sites) > 0:
+                            # if sum(np.isnan(s[i, : first_void + 1, k]))
+                            first_void = possible_sites.nonzero()[0][0]
+                            v[i, : first_void + 1] += np.isnan(s[i, : first_void + 1, k])
+                            s[i, : first_void + 1, k] = np.roll(s[i, : first_void + 1, k], 1)
+    elif p.add_voids == "vibro_random":  # Add voids at base
         # for i in range(5,nx-5):
         for i in range(p.nx):
             for k in range(p.nm):
                 if not np.isnan(s[i, 0, k]):
-                    if np.random.rand() < p.Tg * p.dt / p.dy and np.sum(np.isnan(s[i, :, k])) > 0:
-                        first_void = np.isnan(s[i, :, k]).nonzero()[0][0]
-                        v[i, : first_void + 1] += np.isnan(s[i, : first_void + 1, k])
-                        s[i, : first_void + 1, k] = np.roll(s[i, : first_void + 1, k], 1)
-    # elif p.add_voids == "diff_test":
-    #     if t == 0:
-    #         s[nx // 2, 0, :] = np.nan
+                    if (
+                        np.random.rand() < p.void_production_rate * p.dt / p.dy
+                        and np.sum(np.isnan(s[i, :, k])) > 0
+                    ):
+                        nan_indices = np.where(np.isnan(s[i, :, k]))[0]
+                        target_void = np.random.choice(nan_indices)
+                        v[i, : target_void + 1] += np.isnan(s[i, : target_void + 1, k])
+                        s[i, : target_void + 1, k] = np.roll(s[i, : target_void + 1, k], 1)
+    elif p.add_voids == "vibro_top":  # Add voids at base
+        # for i in range(5,nx-5):
+        for i in range(p.nx):
+            for k in range(p.nm):
+                if not np.isnan(s[i, 0, k]):
+                    if (
+                        np.random.rand() < p.void_production_rate * p.dt / p.dy
+                        and np.sum(np.isnan(s[i, :, k])) > 0
+                    ):
+                        v[i, :] += np.isnan(s[i, :, k])
+                        s[i, :, k] = np.roll(s[i, :, k], 1)
     elif p.add_voids == "pour":  # pour in centre at top
         s[p.nx // 2 - p.half_width : p.nx // 2 + p.half_width + 1, -1, :] = 1.0
 

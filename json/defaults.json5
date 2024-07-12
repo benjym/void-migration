@@ -33,6 +33,11 @@
     fill_ratio : 0.25, // ratio of the domain that is filled with particles
     nu_fill : 0.5, // solid fraction of the particles in the initial condition
     IC_mode : "column", // where should the initial particles be, "column", "random", "top", "full" or "empty"
+
+    // stress
+    calculate_stress : false, // should the stress be calculated
+    stress_fraction : 0.5, // Sets the angle of stress deviation
+    solid_density : 1, // density of the solid particles (kg/m^2)
     
     // saving
     save_inc : 1, // how often to save the state of the system (timesteps)

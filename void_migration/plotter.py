@@ -94,7 +94,7 @@ def set_plot_size(p):
     summary_fig = plt.figure()
 
 
-def update(x, y, s, u, v, c, T, outlet, p, t, *args):
+def update(x, y, s, u, v, c, T, sigma, outlet, p, t, *args):
     if "s" in p.plot:
         if hasattr(p, "charge_discharge"):
             plot_s(x, y, s, p, t, *args)
@@ -118,6 +118,8 @@ def update(x, y, s, u, v, c, T, outlet, p, t, *args):
         plot_stable(x, y, s, p, t)
     if "h" in p.plot:
         plot_h(x, y, s, p, t)
+    if "stress" in p.plot:
+        plot_stress(x, y, s, sigma, p, t)
 
     if "s" in p.save:
         save_s(x, y, s, p, t)
@@ -221,6 +223,24 @@ def plot_s_bar(y, s_bar, nu_time, p):
     plt.ylabel("Height (m)")
     plt.colorbar()
     plt.savefig(p.folderName + "nu.png")
+
+
+def plot_stress(x, y, s, sigma, p, t):
+    plt.figure(55)
+    plt.clf()
+    plt.subplot(131)
+    plt.pcolormesh(x, y, sigma[:, :, 0].T)
+    plt.colorbar()
+
+    plt.subplot(132)
+    plt.pcolormesh(x, y, sigma[:, :, 1].T)
+    plt.colorbar()
+
+    plt.subplot(133)
+    plt.pcolormesh(x, y, (sigma[:, :, 2] / p.mu).T)
+    plt.colorbar()
+
+    plt.savefig(p.folderName + "stress_" + str(t).zfill(6) + ".png", dpi=200)
 
 
 def save_coordinate_system(x, y, p):
