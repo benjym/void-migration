@@ -31,7 +31,10 @@ def time_march(p):
 
     plotter.set_plot_size(p)
 
-    p = params.update_before_time_march(p, cycles)
+    p.update_before_time_march(cycles)
+
+    if p.show_optimal_resolution:
+        p.print_optimal_resolution()
 
     s = initial.IC(p)  # non-dimensional size
     u = np.zeros([p.nx, p.ny])
@@ -40,6 +43,11 @@ def time_march(p):
     p_count_s = np.zeros([p.nt])
     p_count_l = np.zeros([p.nt])
     non_zero_nu_time = np.zeros([p.nt])
+
+    # last_swap is used to keep track of the last time a void was swapped
+    # start off homoegeous and nan where s is voids
+    last_swap = np.zeros_like(s)
+    # last_swap[np.isnan(s)] = np.nan
 
     c = initial.set_concentration(s, p.X, p.Y, p)
 
@@ -52,7 +60,7 @@ def time_march(p):
         T = None
 
     if p.calculate_stress:
-        sigma = stress.calculate_stress(s, p)
+        sigma = stress.calculate_stress(s, last_swap, p)
     else:
         sigma = None
 
@@ -74,14 +82,16 @@ def time_march(p):
             T = thermal.update_temperature(s, T, p)
 
         if p.calculate_stress:
-            sigma = stress.calculate_stress(s, p)
+            sigma = stress.calculate_stress(s, last_swap, p)
 
         if p.charge_discharge:
             p = cycles.charge_discharge(p, t)
             p_count[t], p_count_s[t], p_count_l[t], non_zero_nu_time[t] = cycles.save_quantities(p, s)
 
         if p.vectorized:
-            u, v, s, c, T, N_swap = motion.move_voids_fast(u, v, s, sigma, p, c=c, T=T, N_swap=N_swap)
+            u, v, s, c, T, N_swap, last_swap = motion.move_voids_fast(
+                u, v, s, sigma, last_swap, p, c=c, T=T, N_swap=N_swap
+            )
         else:
             u, v, s, c, T, N_swap = motion.move_voids(u, v, s, p, c=c, T=T, N_swap=N_swap)
 

@@ -1,4 +1,4 @@
-import os
+# import os
 import sys
 import json5
 import numpy as np
@@ -20,6 +20,20 @@ class dict_to_class:
         setattr(self, "lists", lists)
         setattr(self, "list_keys", list_keys)
 
+    def print_optimal_resolution(p):
+        # NOTE: Well defined for monodisperse conditions only
+        # Optimal resolution is when P_adv = 1 and P_diff=0.5.
+        # Under these conditions we have that
+        # dx = 2*alpha*s_bar
+
+        # So for any given s_bar and alpha there is an optimal spatial resolution
+        s_bar = (p.s_m + p.s_M) / 2.0  # mean diameter (m)
+        dx = 2 * p.alpha * s_bar
+        # dt = p.dx / np.sqrt(p.g * s_bar)
+
+        ny = int(p.H / dx)
+        print(f"Optimal condition: ny = {ny}.")
+
     def set_defaults(self):
         with open("json/defaults.json5", "r") as f:
             defaults_dict = json5.loads(f.read())
@@ -28,15 +42,6 @@ class dict_to_class:
             if not hasattr(self, key):
                 setattr(self, key, defaults_dict[key])
 
-        if not hasattr(self, "folderName"):
-            self.folderName = "output/"
-
-        if not os.path.exists(self.folderName):
-            os.makedirs(self.folderName)
-
-        if len(self.save) > 0:
-            if not os.path.exists(self.folderName + "data/"):
-                os.makedirs(self.folderName + "data/")
         if hasattr(self, "aspect_ratio_y"):
             self.ny = int(self.nx * self.aspect_ratio_y)
         if hasattr(self, "aspect_ratio_m"):
@@ -60,15 +65,74 @@ class dict_to_class:
             self.repose_angle = np.degrees(np.arctan(self.mu))
         if hasattr(self, "repose_angle"):
             self.mu = np.tan(np.radians(self.repose_angle))
-        # print(self.mu)
-        # print(self.repose_angle)
-        # sys.exit()
 
         with np.errstate(divide="ignore", invalid="ignore"):
             inv_mu = np.nan_to_num(1.0 / self.mu, nan=0.0, posinf=1e30, neginf=0.0)
-        self.delta_limit = self.nu_cs / (inv_mu + 1)
+        self.delta_limit = 1.15 * self.nu_cs / (inv_mu + 1)
+        # 1.414 -> 90 deg at varphi=70, otherwise good
+        # 1.200 -> 90 deg at varphi=80, otherwise good
+        # 1.100 -> very good? bit low (30-80 is below line)
+        # 1.150 ->
 
         # self.stress_fraction = 2 * self.mu / (2 * self.mu + 1)
+
+    def update_before_time_march(self, cycles):
+        self.y = np.linspace(0, self.H, self.ny)
+        self.dy = self.y[1] - self.y[0]
+        self.x = np.arange(
+            -(self.nx - 0.5) / 2 * self.dy, (self.nx - 0.5) / 2 * self.dy, self.dy
+        )  # force equal grid spacing
+        self.dx = self.x[1] - self.x[0]
+        if not np.isclose(self.dx, self.dy):
+            sys.exit(f"Fatal error: dx != dy. dx = {self.dx}, dy = {self.dy}")
+
+        self.X, self.Y = np.meshgrid(self.x, self.y, indexing="ij")
+
+        self.y += self.dy / 2.0
+        self.t = 0
+
+        # self.t_p = self.s_m / np.sqrt(self.g * self.H)  # smallest confinement timescale (at bottom) (s)
+        s_bar = (self.s_m + self.s_M) / 2.0  # mean diameter (m)
+        self.free_fall_velocity = np.sqrt(self.g * s_bar)  # time to fall one mean diameter (s)
+        self.diffusivity = self.alpha * self.free_fall_velocity * s_bar  # diffusivity (m^2/s)
+
+        safe = False
+        stability = 1
+        while not safe:
+            self.P_u_ref = stability
+            self.dt = self.P_u_ref * self.dy / self.free_fall_velocity
+
+            self.P_lr_ref = (
+                self.diffusivity * self.dt / self.dy**2
+            )  # ignoring factor of 2 because that assumes P=0.5
+            # self.P_lr_ref = self.alpha * self.P_u_ref
+
+            self.P_u_max = self.P_u_ref * (self.s_M / self.s_m)
+            self.P_lr_max = self.P_lr_ref * (self.s_M / self.s_m)
+
+            if self.vectorized:
+                if self.P_u_max <= 1 and self.P_lr_max <= self.P_stab:
+                    safe = True
+                else:
+                    stability *= 0.95
+            else:
+                if self.P_u_max + 2 * self.P_lr_max <= self.P_stab:
+                    safe = True
+                else:
+                    stability *= 0.95
+
+        # print(f"P_u_ref : {self.P_u_ref}")
+        # print(f"P_u_max : {self.P_u_max}")
+        # print(f"P_lr_ref : {self.P_lr_ref}")
+        # print(f"P_lr_max : {self.P_lr_max}")
+
+        if self.charge_discharge:
+            self.nt = cycles.set_nt(self)
+        else:
+            self.nt = int(np.ceil(self.t_f / self.dt))
+
+        if hasattr(self, "saves"):
+            self.save_inc = int(self.nt / self.saves)
 
 
 def load_file(f):
@@ -79,55 +143,3 @@ def load_file(f):
     p = dict_to_class(dict)
     p.set_defaults()
     return dict, p
-
-
-def update_before_time_march(p, cycles):
-    p.y = np.linspace(0, p.H, p.ny)
-    p.dy = p.y[1] - p.y[0]
-    p.x = np.arange(-(p.nx - 0.5) / 2 * p.dy, (p.nx - 0.5) / 2 * p.dy, p.dy)  # force equal grid spacing
-    p.dx = p.x[1] - p.x[0]
-    if not np.isclose(p.dx, p.dy):
-        sys.exit(f"Fatal error: dx != dy. dx = {p.dx}, dy = {p.dy}")
-
-    p.X, p.Y = np.meshgrid(p.x, p.y, indexing="ij")
-
-    p.y += p.dy / 2.0
-    p.t = 0
-
-    # p.t_p = p.s_m / np.sqrt(p.g * p.H)  # smallest confinement timescale (at bottom) (s)
-    s_bar = (p.s_m + p.s_M) / 2.0  # mean diameter (m)
-    p.free_fall_velocity = np.sqrt(p.g * s_bar)  # time to fall one mean diameter (s)
-    p.diffusivity = p.alpha * p.free_fall_velocity * s_bar  # diffusivity (m^2/s)
-
-    safe = False
-    stability = 0.5
-    while not safe:
-        p.P_u_ref = stability
-        p.dt = p.P_u_ref * p.dy / p.free_fall_velocity
-
-        p.P_lr_ref = p.diffusivity * p.dt / p.dy**2  # ignoring factor of 2 because that assumes P=0.5
-        # p.P_lr_ref = p.alpha * p.P_u_ref
-
-        p.P_u_max = p.P_u_ref * (p.s_M / p.s_m)
-        p.P_lr_max = p.P_lr_ref * (p.s_M / p.s_m)
-
-        if p.vectorized:
-            if p.P_u_max <= p.P_stab and p.P_lr_max <= p.P_stab:
-                safe = True
-            else:
-                stability *= 0.95
-        else:
-            if p.P_u_max + 2 * p.P_lr_max <= p.P_stab:
-                safe = True
-            else:
-                stability *= 0.95
-
-    if p.charge_discharge:
-        p.nt = cycles.set_nt(p)
-    else:
-        p.nt = int(np.ceil(p.t_f / p.dt))
-
-    if hasattr(p, "saves"):
-        p.save_inc = int(p.nt / p.saves)
-
-    return p

@@ -7,14 +7,15 @@ import operators
 # from numba import njit
 
 
-def stable_slope_fast(s, dir, delta_limit):
+def stable_slope_fast(s, dir, p):
     # dest = np.roll(s, dir, axis=0)
     nu_here = operators.get_solid_fraction(s)
     # nu_dest = operators.get_solid_fraction(dest)
     nu_dest = np.roll(nu_here, dir, axis=0)
     delta_nu = nu_dest - nu_here
+    nu_up = np.roll(nu_here, 1, axis=1)
+    stable = (delta_nu <= p.delta_limit) & (nu_up == 0.0)
 
-    stable = delta_nu <= delta_limit
     Stable = np.repeat(stable[:, :, np.newaxis], s.shape[2], axis=2)
     return Stable
 
@@ -90,6 +91,7 @@ def move_voids_fast(
     v: ArrayLike,
     s: ArrayLike,
     sigma: ArrayLike,
+    last_swap: ArrayLike,
     p: params.dict_to_class,
     diag: int = 0,
     c: None | ArrayLike = None,
@@ -144,10 +146,11 @@ def move_voids_fast(
             elif d == -1:  # right
                 P[-1, :, :] = 0  # no swapping right from rightmost column
 
-            slope_stable = stable_slope_fast(s, d, p.delta_limit)
+            slope_stable = stable_slope_fast(s, d, p)
             P[slope_stable] = 0
 
-            # m = p.mu > sigma[:, :, 2]  # stable where mobilised less than critical
+            # m = sigma[:, :, 2] < p.mu  # stable where mobilised less than critical
+            # m[nu == 0] = False  # stability is not relevant for voids
             # slope_stable = np.repeat(m[:, :, np.newaxis], p.nm, axis=2)
             # P[slope_stable] = 0
 
@@ -186,7 +189,12 @@ def move_voids_fast(
             s[swap_indices[:, 0], swap_indices[:, 1], swap_indices[:, 2]],
         )
 
-    return u, v, s, c, T, N_swap
+        last_swap[swap_indices[:, 0], swap_indices[:, 1], swap_indices[:, 2]] = (
+            2 * axis - 1
+        )  # 1 for up, -1 for left or right
+
+    last_swap[np.isnan(s)] = np.nan
+    return u, v, s, c, T, N_swap, last_swap
 
 
 # @njit
@@ -353,20 +361,33 @@ def add_voids(u, v, s, p, c, outlet):
     if p.add_voids == "central_outlet":  # Remove at central outlet - use this one
         for i in range(p.nx // 2 - p.half_width, p.nx // 2 + p.half_width + 1):
             for k in range(p.nm):
-                # if np.random.rand() < 0.1:
-                if not np.isnan(s[i, 0, k]):
-                    if p.refill:
-                        if (
-                            np.sum(
-                                np.isnan(s[p.nx // 2 - p.half_width : p.nx // 2 + p.half_width + 1, -1, k])
-                            )
-                            > 0
-                        ):
-                            target = np.random.choice(np.nonzero(np.isnan(s[:, -1, k]))[0])
-                            s[target, -1, k], s[i, 0, k] = s[i, 0, k], s[target, -1, k]
-                    else:
-                        s[i, 0, k] = np.nan
-                    outlet[-1] += 1
+                if np.random.rand() < p.outlet_rate:
+                    if not np.isnan(s[i, 0, k]):
+                        if p.refill:
+                            # old version, puts in top row
+                            # if (
+                            #     np.sum(
+                            #         np.isnan(
+                            #             s[p.nx // 2 - p.half_width : p.nx // 2 + p.half_width + 1, -1, k]
+                            #         )
+                            #     )
+                            #     > 0
+                            # ):
+                            #     target = np.random.choice(np.nonzero(np.isnan(s[:, -1, k]))[0])
+                            #     s[target, -1, k], s[i, 0, k] = s[i, 0, k], s[target, -1, k]
+
+                            # new version, puts in first available space, no freefalling
+                            target_column = np.random.choice(p.nx)
+                            solid_indices = np.nonzero(~np.isnan(s[target_column, :, k]))[0]
+                            topmost_solid = solid_indices[-1]
+                            if topmost_solid < p.ny - 1:
+                                s[target_column, topmost_solid + 1, k], s[i, 0, k] = (
+                                    s[i, 0, k],
+                                    s[target_column, topmost_solid + 1, k],
+                                )
+                        else:
+                            s[i, 0, k] = np.nan
+                        outlet[-1] += 1
     # elif temp_mode == "temperature":  # Remove at central outlet
     #     for i in range(nx // 2 - half_width, nx // 2 + half_width + 1):
     #         for k in range(nm):

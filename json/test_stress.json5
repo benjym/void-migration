@@ -9,7 +9,7 @@
     H : 1, // (m)
     
     // material properties
-    repose_angle : 30, // (degrees)
+    repose_angle : 90, // (degrees)
     gsd_mode : 'mono',
     s_m : 0.01, // minimum particle size (m)
     s_M : 0.01, // maximum particle size (m)
@@ -23,13 +23,12 @@
 
     // stress
     calculate_stress : true, // should the stress be calculated
-    stress_fraction : 0,
 
     // saving
     saves : 100,   // how many saves to make
     t_f : 150,  // s
     plot : ['nu','stress'],
-    videos : ['nu'],
+    videos : ['nu','stress'],
     save : ['nu'],
     mask_s_bar : false,
 

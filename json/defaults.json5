@@ -14,6 +14,7 @@
     internal_geometry : false, // true if internal geometry is present, currently defined only for a single case
     cyclic_BC : false, // true if cyclic BCs are used horizontally
     refill : false, // should the particles come back in the top if they leave the bottom
+    outlet_rate : 1.0, // proportion of each timestep that the outlet is open
     
     // void migration model parameters
     diag : 0,
@@ -36,10 +37,11 @@
 
     // stress
     calculate_stress : false, // should the stress be calculated
-    stress_fraction : 0.5, // Sets the angle of stress deviation
-    solid_density : 1, // density of the solid particles (kg/m^2)
+    stress_mode : 'isotropic', // 'isotropic' or 'anisotropic'
+    solid_density : 2700, // density of the solid particles (kg/m^2)
     
     // saving
+    folderName : "output/", // name of the folder to save the data in
     save_inc : 1, // how often to save the state of the system (timesteps)
     t_f : 5,  // final time to end the simulation (s)
     plot : ['nu', 's'], // which variables to plot. Should at least include the ones to make videos.
@@ -52,4 +54,7 @@
     // parallel code
     max_workers : 4, // max number of workers to run simultaneously. Default value is actually set void_migration.py
     vectorized : true, // should the code be vectorized (i.e. faster)
+
+    // diagnostics
+    show_optimal_resolution : false, // should the optimal resolution be shown on the screen at runtime
 }

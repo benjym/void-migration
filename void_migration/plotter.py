@@ -1,4 +1,5 @@
 import subprocess
+import os
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.colors import LinearSegmentedColormap
@@ -6,6 +7,7 @@ import matplotlib.cm as cm
 import warnings
 import operators
 import motion
+import stress
 
 # _video_encoding = ["-c:v", "libx265", "-preset", "fast", "-crf", "28", "-tag:v", "hvc1"] # nice small file sizes
 _video_encoding = [
@@ -67,7 +69,7 @@ inferno.set_bad("w", 0.0)
 inferno_r = cm.get_cmap("inferno_r")
 inferno_r.set_bad("w", 0.0)
 
-global fig, summary_fig
+global fig, summary_fig, triple_fig
 
 replacements = {
     "repose_angle": "φ",
@@ -84,17 +86,28 @@ def replace_strings(text, replacements):
 
 
 def set_plot_size(p):
-    global fig, summary_fig
+    global fig, summary_fig, triple_fig
 
     # wipe any existing figures
     for i in plt.get_fignums():
         plt.close(i)
 
     fig = plt.figure(figsize=[p.nx / _dpi, p.ny / _dpi])
+    triple_fig = plt.figure(figsize=[p.nx / _dpi, 3 * p.ny / _dpi])
     summary_fig = plt.figure()
 
 
+def check_folders_exist(p):
+    if not os.path.exists(p.folderName):
+        os.makedirs(p.folderName)
+    if len(p.save) > 0:
+        if not os.path.exists(p.folderName + "data/"):
+            os.makedirs(p.folderName + "data/")
+
+
 def update(x, y, s, u, v, c, T, sigma, outlet, p, t, *args):
+    check_folders_exist(p)
+
     if "s" in p.plot:
         if hasattr(p, "charge_discharge"):
             plot_s(x, y, s, p, t, *args)
@@ -226,24 +239,44 @@ def plot_s_bar(y, s_bar, nu_time, p):
 
 
 def plot_stress(x, y, s, sigma, p, t):
-    plt.figure(55)
+    if sigma is None:
+        sigma = stress.calculate_stress(s, None, p)
+    plt.figure(triple_fig)
     plt.clf()
-    plt.subplot(131)
-    plt.pcolormesh(x, y, sigma[:, :, 0].T)
-    plt.colorbar()
+    plt.subplot(311)
+    plt.pcolormesh(
+        x,
+        y,
+        sigma[:, :, 0].T,
+        cmap="bwr",
+        vmin=-np.amax(np.abs(sigma[:, :, 0])),
+        vmax=np.amax(np.abs(sigma[:, :, 0])),
+    )
+    plt.axis("off")
+    plt.xlim(x[0], x[-1])
+    plt.ylim(y[0], y[-1])
+    # plt.colorbar()
 
-    plt.subplot(132)
+    plt.subplot(312)
     plt.pcolormesh(x, y, sigma[:, :, 1].T)
-    plt.colorbar()
+    plt.axis("off")
+    plt.xlim(x[0], x[-1])
+    plt.ylim(y[0], y[-1])
+    # plt.colorbar()
 
-    plt.subplot(133)
-    plt.pcolormesh(x, y, (sigma[:, :, 2] / p.mu).T)
-    plt.colorbar()
+    plt.subplot(313)
+    plt.pcolormesh(x, y, sigma[:, :, 2].T, vmin=0, vmax=p.mu)
+    plt.axis("off")
+    plt.xlim(x[0], x[-1])
+    plt.ylim(y[0], y[-1])
+    # plt.colorbar()
 
-    plt.savefig(p.folderName + "stress_" + str(t).zfill(6) + ".png", dpi=200)
+    plt.subplots_adjust(left=0, right=1, bottom=0, top=1, wspace=0, hspace=0)
+    plt.savefig(p.folderName + "stress_" + str(t).zfill(6) + ".png")
 
 
 def save_coordinate_system(x, y, p):
+    check_folders_exist(p)
     np.savetxt(p.folderName + "data/x.csv", x, delimiter=",")
     np.savetxt(p.folderName + "data/y.csv", y, delimiter=",")
 
@@ -568,12 +601,11 @@ def make_video(p):
 
 def stack_videos(paths, name, videos):
     if is_ffmpeg_installed:
-        cmd = [
-            "ffmpeg",
-            "-y",
-        ]
-
         for video in videos:
+            cmd = [
+                "ffmpeg",
+                "-y",
+            ]
             for path in paths:
                 cmd.extend(["-i", f"{path}/{video}_video.mp4"])
             pad_string = ""
@@ -590,7 +622,10 @@ def stack_videos(paths, name, videos):
                     f"{video}_videos.mp4",
                 ]
             )
-            subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            result = subprocess.run(cmd, capture_output=True, text=True)
+            if not result.returncode == 0:
+                print(f"Error stacking first pass {video} videos")
+                print("Error message:", result.stderr)
 
         if len(videos) > 1:
             cmd = ["ffmpeg", "-y"]
@@ -605,11 +640,15 @@ def stack_videos(paths, name, videos):
                     f"output/{name}.mp4",
                 ]
             )
-            subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            result = subprocess.run(cmd, capture_output=True, text=True)
 
-            cmd = ["rm"]
-            for video in videos:
-                cmd.append(f"{video}_videos.mp4")
-            subprocess.run(cmd)
+            if result.returncode == 0:
+                cmd = ["rm"]
+                for video in videos:
+                    cmd.append(f"{video}_videos.mp4")
+                subprocess.run(cmd)
+            else:
+                print("Error stacking second pass videos")
+                print("Error message:", result.stderr)
     else:
         print("ffmpeg not installed, cannot make videos")
