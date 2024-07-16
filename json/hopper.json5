@@ -3,7 +3,7 @@
     // nx : 20, // width
     nx : 50,
     aspect_ratio_y : 2,  // ny = aspect_ratio * nx
-    aspect_ratio_m : 0.5,  // nm = aspect_ratio * nx
+    aspect_ratio_m : 2,  // nm = aspect_ratio * nx
     // nm : 2,
 
     // geometry
@@ -14,8 +14,8 @@
     
     // material properties
     // alpha : [1.0,10.0,100.0],
-    // alpha : 1.0,
-    alpha : [0.5,1.0,2.0],  
+    alpha : 1.0,
+    // alpha : [0.5,1.0,2.0],  
     repose_angle : 30,  // friction angle, degrees
     half_width : 1,  // half width of outlet in grid points
     outlet_rate : 1,  // rate of outlet opening
@@ -36,8 +36,8 @@
     
     // saving
     saves : 100,  // how often to save
-    plot : ['nu', 's', 'stress'],  // what to plot
-    videos : ['nu', 's', 'stress'],  // what to save videos of
+    plot : ['nu', 's', 'sigma_yy'],  // what to plot
+    videos : ['nu', 's', 'sigma_yy'],  // what to save videos of
     save : ['outlet'],
 
     // testing area

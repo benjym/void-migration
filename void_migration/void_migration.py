@@ -67,7 +67,7 @@ def time_march(p):
     outlet = []
     if len(p.save) > 0:
         plotter.save_coordinate_system(p.x, p.y, p)
-    plotter.update(p.x, p.y, s, u, v, c, T, sigma, outlet, p, 0)
+    plotter.update(p.x, p.y, s, u, v, c, T, sigma, last_swap, outlet, p, 0)
 
     N_swap = None
     p.indices = np.arange(p.nx * (p.ny - 1) * p.nm)
@@ -101,9 +101,9 @@ def time_march(p):
             u, v, s = motion.close_voids(u, v, s)
 
         if t % p.save_inc == 0:
-            plotter.update(p.x, p.y, s, u, v, c, T, sigma, outlet, p, t)
+            plotter.update(p.x, p.y, s, u, v, c, T, sigma, last_swap, outlet, p, t)
 
-    plotter.update(p.x, p.y, s, u, v, c, T, sigma, outlet, p, t)
+    plotter.update(p.x, p.y, s, u, v, c, T, sigma, last_swap, outlet, p, t)
 
 
 def run_simulation(sim_with_index):

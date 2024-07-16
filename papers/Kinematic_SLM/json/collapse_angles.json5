@@ -22,6 +22,7 @@
     s_M : 0.01, // maximum particle size (m)
     nu_cs : 0.5,
     alpha : 1,
+    P_stab : 0.01,
     
     // initial condition:
     fill_ratio : 0.25,
@@ -30,7 +31,8 @@
 
     // stress
     // calculate_stress : true, // should the stress be calculated
-    stress_mode : 'isotropic',
+    // stress_mode : 'isotropic',
+    stress_mode : 'anisotropic',
     
     // saving
     saves : 100,   // how many saves to make

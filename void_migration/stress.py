@@ -13,26 +13,37 @@ import warnings
 # c_0^2 = lateral earth pressure coefficient, K
 # Using Jaky's formula, K = 1 - sin(phi), where phi is the repose angle (actually effective angle of internal friction)
 # stress_fraction = sin(phi)
+# or if we have a different value for K, we have that
+# stress_fraction = 1 - K
 
 # ANISOTROPIC STRESS
-# Rothenburg and Bathurst: mu approx = a/2
+# Rothenburg and Bathurst: mu approx = a/2 <--- does this help??
 # Can take a = beta x magnitude of 1/M sum_k P^{last}_k
 # Where P_{last}^k = -1 for vertical and 1 for horizontal? (So that a = 0 for homogenous, 1 for fully ordered
 
-# Putting this all together
-# stress_fraction = 2 * (a/2)^2 / (1 + 2*(a/2)^2) = a^2 / (1 + a^2)
+# Now we want to map the following:
+# a = -1 -> K_p = (1+sin(phi))/(1-sin(phi))
+# a = 0 -> K = 1
+# a = 1 -> K_a = (1-sin(phi))/(1+sin(phi))
+
+# This can be satisfied with the following logarithmic scaling:
+# K = K_p*(K_a/K_p)^((a+1)/2)
 
 
 def calculate_stress(s, last_swap, p):
     if p.stress_mode == "isotropic":
         stress_fraction = np.sin(np.radians(p.repose_angle))
+        stress_fraction = np.full([p.nx, p.ny], stress_fraction)
     elif p.stress_mode == "anisotropic":
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", category=RuntimeWarning)
             a = np.abs(
                 np.nanmean(last_swap, axis=2)
             )  # between 0 and 1, 0 for isotropic, 1 for fully anisotropic
-            stress_fraction = a**0.5
+            K_p = (1 + np.sin(np.radians(p.repose_angle))) / (1 - np.sin(np.radians(p.repose_angle)))
+            K_a = 1 / K_p
+            K = K_p * (K_a / K_p) ** ((a + 1) / 2)
+            stress_fraction = 1 - K
 
     sigma = np.zeros([p.nx, p.ny, 3])  # sigma_xy, sigma_yy, mu
     # NOTE: NOT CONSIDERING INCLINED GRAVITY
@@ -54,13 +65,13 @@ def calculate_stress(s, last_swap, p):
                 else:
                     left_up = sigma[i - 1, j + 1]
                     right_up = sigma[i + 1, j + 1]
-                sigma[i, j, 0] = 0.5 * (left_up[0] + right_up[0]) + 0.5 * (1 - stress_fraction) * (
+                sigma[i, j, 0] = 0.5 * (left_up[0] + right_up[0]) + 0.5 * (1 - stress_fraction[i, j]) * (
                     left_up[1] - right_up[1]
                 )
                 sigma[i, j, 1] = (
                     this_weight
-                    + stress_fraction * up[1]
-                    + 0.5 * (1 - stress_fraction) * (left_up[1] + right_up[1])
+                    + stress_fraction[i, j] * up[1]
+                    + 0.5 * (1 - stress_fraction[i, j]) * (left_up[1] + right_up[1])
                     + 0.5 * (left_up[0] - right_up[0])
                 )
     with np.errstate(divide="ignore", invalid="ignore"):

@@ -105,7 +105,7 @@ def check_folders_exist(p):
             os.makedirs(p.folderName + "data/")
 
 
-def update(x, y, s, u, v, c, T, sigma, outlet, p, t, *args):
+def update(x, y, s, u, v, c, T, sigma, last_swap, outlet, p, t, *args):
     check_folders_exist(p)
 
     if "s" in p.plot:
@@ -132,7 +132,9 @@ def update(x, y, s, u, v, c, T, sigma, outlet, p, t, *args):
     if "h" in p.plot:
         plot_h(x, y, s, p, t)
     if "stress" in p.plot:
-        plot_stress(x, y, s, sigma, p, t)
+        plot_stress(x, y, s, sigma, last_swap, p, t)
+    if "sigma_yy" in p.plot:
+        plot_sigma_yy(x, y, s, sigma, last_swap, p, t)
 
     if "s" in p.save:
         save_s(x, y, s, p, t)
@@ -238,9 +240,39 @@ def plot_s_bar(y, s_bar, nu_time, p):
     plt.savefig(p.folderName + "nu.png")
 
 
-def plot_stress(x, y, s, sigma, p, t):
+def plot_sigma_yy(x, y, s, sigma, last_swap, p, t):
     if sigma is None:
-        sigma = stress.calculate_stress(s, None, p)
+        sigma = stress.calculate_stress(s, last_swap, p)
+    sigma_yy = np.ma.masked_where(sigma[:, :, 1] == 0.0, sigma[:, :, 1])
+    plt.figure(fig)
+    plt.clf()
+    plt.pcolormesh(x, y, sigma_yy.T)
+    plt.axis("off")
+    plt.xlim(x[0], x[-1])
+    plt.ylim(y[0], y[-1])
+
+    plt.subplots_adjust(left=0, right=1, bottom=0, top=1, wspace=0, hspace=0)
+    plt.savefig(p.folderName + "sigma_yy_" + str(t).zfill(6) + ".png")
+
+
+def plot_rel_mu(x, y, s, sigma, last_swap, p, t):
+    if sigma is None:
+        sigma = stress.calculate_stress(s, last_swap, p)
+    mu = np.ma.masked_where(sigma[:, :, 2] == 0.0, sigma[:, :, 2])
+    plt.figure(fig)
+    plt.clf()
+    plt.pcolormesh(x, y, (mu / p.mu).T, vmin)
+    plt.axis("off")
+    plt.xlim(x[0], x[-1])
+    plt.ylim(y[0], y[-1])
+
+    plt.subplots_adjust(left=0, right=1, bottom=0, top=1, wspace=0, hspace=0)
+    plt.savefig(p.folderName + "sigma_yy_" + str(t).zfill(6) + ".png")
+
+
+def plot_stress(x, y, s, sigma, last_swap, p, t):
+    if sigma is None:
+        sigma = stress.calculate_stress(s, last_swap, p)
     plt.figure(triple_fig)
     plt.clf()
     plt.subplot(311)

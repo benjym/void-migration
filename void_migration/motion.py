@@ -13,8 +13,11 @@ def stable_slope_fast(s, dir, p):
     # nu_dest = operators.get_solid_fraction(dest)
     nu_dest = np.roll(nu_here, dir, axis=0)
     delta_nu = nu_dest - nu_here
-    nu_up = np.roll(nu_here, 1, axis=1)
-    stable = (delta_nu <= p.delta_limit) & (nu_up == 0.0)
+
+    nu_up = np.roll(nu_here, -1, axis=1)
+    nu_up_left = np.roll(nu_up, -1, axis=0)
+    nu_up_right = np.roll(nu_up, 1, axis=0)
+    stable = (delta_nu <= p.delta_limit) & ((nu_up == 0.0) | (nu_up_left == 0.0) | (nu_up_right == 0.0))
 
     Stable = np.repeat(stable[:, :, np.newaxis], s.shape[2], axis=2)
     return Stable
@@ -117,8 +120,10 @@ def move_voids_fast(
         c: The updated concentration field
         T: The updated temperature field
     """
+    options = np.array([(1, -1), (0, -1), (0, 1)])  # up, left, right
+    np.random.shuffle(options)  # oh boy, this is a massive hack
 
-    for axis, d in [(1, -1), (0, -1), (0, 1)]:  # up, left, right
+    for axis, d in options:
         nu = 1.0 - np.mean(np.isnan(s), axis=2)
 
         solid = nu >= p.nu_cs
