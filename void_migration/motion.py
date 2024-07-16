@@ -369,27 +369,19 @@ def add_voids(u, v, s, p, c, outlet):
                 if np.random.rand() < p.outlet_rate:
                     if not np.isnan(s[i, 0, k]):
                         if p.refill:
-                            # old version, puts in top row
-                            # if (
-                            #     np.sum(
-                            #         np.isnan(
-                            #             s[p.nx // 2 - p.half_width : p.nx // 2 + p.half_width + 1, -1, k]
-                            #         )
-                            #     )
-                            #     > 0
-                            # ):
-                            #     target = np.random.choice(np.nonzero(np.isnan(s[:, -1, k]))[0])
-                            #     s[target, -1, k], s[i, 0, k] = s[i, 0, k], s[target, -1, k]
-
-                            # new version, puts in first available space, no freefalling
                             target_column = np.random.choice(p.nx)
-                            solid_indices = np.nonzero(~np.isnan(s[target_column, :, k]))[0]
-                            topmost_solid = solid_indices[-1]
-                            if topmost_solid < p.ny - 1:
-                                s[target_column, topmost_solid + 1, k], s[i, 0, k] = (
-                                    s[i, 0, k],
-                                    s[target_column, topmost_solid + 1, k],
-                                )
+                            nu_up = np.roll(1 - np.mean(np.isnan(s[target_column, :, :]), axis=1), -1)
+                            solid = ~np.isnan(s[target_column, :, k])
+                            liquid_up = nu_up + 1 / p.nm <= p.nu_cs
+
+                            solid_indices = np.nonzero(solid & liquid_up)[0]
+                            if len(solid_indices) > 0:
+                                topmost_solid = solid_indices[-1]
+                                if topmost_solid < p.ny - 1:
+                                    s[target_column, topmost_solid + 1, k], s[i, 0, k] = (
+                                        s[i, 0, k],
+                                        s[target_column, topmost_solid + 1, k],
+                                    )
                         else:
                             s[i, 0, k] = np.nan
                         outlet[-1] += 1

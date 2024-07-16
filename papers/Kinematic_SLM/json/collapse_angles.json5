@@ -1,9 +1,9 @@
 {
     // resolution
     // testing
-    nx : 40, // width
+    // nx : 40, // width
     // nx : 80, // width
-    // nx : 100,
+    nx : 100,
 
     // paper version
     // nx : 200, // width
