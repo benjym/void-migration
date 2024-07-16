@@ -4,20 +4,21 @@ from scipy.ndimage import maximum_filter
 import params
 import operators
 
-# from numba import njit
 
-
-def stable_slope_fast(s, dir, p):
-    # dest = np.roll(s, dir, axis=0)
-    nu_here = operators.get_solid_fraction(s)
-    # nu_dest = operators.get_solid_fraction(dest)
-    nu_dest = np.roll(nu_here, dir, axis=0)
-    delta_nu = nu_dest - nu_here
-
+def empty_up(nu_here):
+    # would this be faster with a convolution?
     nu_up = np.roll(nu_here, -1, axis=1)
     nu_up_left = np.roll(nu_up, -1, axis=0)
     nu_up_right = np.roll(nu_up, 1, axis=0)
-    stable = (delta_nu <= p.delta_limit) & ((nu_up == 0.0) | (nu_up_left == 0.0) | (nu_up_right == 0.0))
+    return (nu_up == 0.0) | (nu_up_left == 0.0) | (nu_up_right == 0.0)
+
+
+def stable_slope_fast(s, dir, p, potential_free_surface):
+    nu_here = operators.get_solid_fraction(s)
+    nu_dest = np.roll(nu_here, dir, axis=0)
+    delta_nu = nu_dest - nu_here
+
+    stable = (delta_nu <= p.delta_limit) & potential_free_surface
 
     Stable = np.repeat(stable[:, :, np.newaxis], s.shape[2], axis=2)
     return Stable
@@ -134,25 +135,28 @@ def move_voids_fast(
         dest = np.roll(s, d, axis=axis)
         s_bar = operators.get_average(s)
         S_bar = np.repeat(s_bar[:, :, np.newaxis], p.nm, axis=2)
+        S_bar_dest = np.roll(S_bar, d, axis=axis)
+
+        potential_free_surface = empty_up(nu)
+
         if axis == 1:
             s_inv_bar = operators.get_hyperbolic_average(s)
             S_inv_bar = np.repeat(s_inv_bar[:, :, np.newaxis], p.nm, axis=2)
             S_inv_bar_dest = np.roll(S_inv_bar, d, axis=axis)
-            # P = p.P_u_ref * (S / dest)
-            P = p.dt / p.dy * np.sqrt(p.g * S_bar) * (S_inv_bar_dest / dest)
+            # P = p.P_u_ref * (S_inv_bar_dest / dest)
+            P = (p.dt / p.dy) * np.sqrt(p.g * S_bar_dest) * (S_inv_bar_dest / dest)
 
             P[:, -1, :] = 0  # no swapping up from top row
         elif axis == 0:
-            S_dest = np.roll(S_bar, d, axis=axis)
-            # P = p.P_lr_ref * (dest / S)
-            P = p.alpha * np.sqrt(p.g * S_bar) * S_bar * p.dt / p.dy**2 * (dest / S_dest)
+            # P = p.P_lr_ref * (dest / S_bar_dest)
+            P = p.alpha * np.sqrt(p.g * S_bar_dest) * S_bar_dest * (p.dt / p.dy**2) * (dest / S_bar_dest)
 
             if d == 1:  # left
                 P[0, :, :] = 0  # no swapping left from leftmost column
             elif d == -1:  # right
                 P[-1, :, :] = 0  # no swapping right from rightmost column
 
-            slope_stable = stable_slope_fast(s, d, p)
+            slope_stable = stable_slope_fast(s, d, p, potential_free_surface)
             P[slope_stable] = 0
 
             # m = sigma[:, :, 2] < p.mu  # stable where mobilised less than critical
@@ -167,6 +171,13 @@ def move_voids_fast(
         total_swap = np.sum(swap, axis=2, dtype=int)
         max_swap = ((p.nu_cs - nu) * p.nm).astype(int)
 
+        if axis == 0:
+            nu_dest = np.roll(nu, d, axis=axis)
+            delta_nu = nu_dest - nu
+            max_swap = np.where(
+                potential_free_surface, ((delta_nu - p.delta_limit) * p.nm).astype(int), max_swap
+            )
+
         overfilled = total_swap - max_swap
         overfilled = np.maximum(overfilled, 0)
 
@@ -174,7 +185,7 @@ def move_voids_fast(
             for j in range(p.ny):
                 if overfilled[i, j] > 0:
                     swap_args = np.argwhere(swap[i, j, :]).flatten()
-                    if len(swap_args) > 0:
+                    if len(swap_args) >= overfilled[i, j]:
                         over_indices = np.random.choice(swap_args, size=overfilled[i, j], replace=False)
                         swap[i, j, over_indices] = False
 

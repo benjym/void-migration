@@ -2,11 +2,11 @@
     // resolution
     // testing
     // nx : 40, // width
-    nx : 80, // width
+    // nx : 80, // width
     // nx : 100,
 
     // paper version
-    // nx : 200, // width
+    nx : 200, // width
     
     // geometry
     H : 1, // (m)
@@ -22,7 +22,7 @@
     s_M : 0.01, // maximum particle size (m)
     nu_cs : 0.5,
     alpha : 1,
-    P_stab : 0.01,
+    P_stab : 0.5,
     
     // initial condition:
     fill_ratio : 0.25,

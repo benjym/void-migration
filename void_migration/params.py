@@ -68,14 +68,7 @@ class dict_to_class:
 
         with np.errstate(divide="ignore", invalid="ignore"):
             inv_mu = np.nan_to_num(1.0 / self.mu, nan=0.0, posinf=1e30, neginf=0.0)
-        # self.delta_limit = 1.12 * self.nu_cs / (inv_mu + 1)
         self.delta_limit = self.nu_cs / (inv_mu + 1)
-        # 1.414 -> 90 deg at varphi=70, otherwise good
-        # 1.200 -> 90 deg at varphi=80, otherwise good
-        # 1.100 -> very good? bit low (30-80 is below line)
-        # 1.150 -> 90 deg at varphi=80
-
-        # self.stress_fraction = 2 * self.mu / (2 * self.mu + 1)
 
     def update_before_time_march(self, cycles):
         self.y = np.linspace(0, self.H, self.ny)
