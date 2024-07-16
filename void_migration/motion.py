@@ -132,19 +132,20 @@ def move_voids_fast(
         unstable = np.isnan(s) * ~Solid  # & ~Skip
 
         dest = np.roll(s, d, axis=axis)
-
+        s_bar = operators.get_average(s)
+        S_bar = np.repeat(s_bar[:, :, np.newaxis], p.nm, axis=2)
         if axis == 1:
             s_inv_bar = operators.get_hyperbolic_average(s)
             S_inv_bar = np.repeat(s_inv_bar[:, :, np.newaxis], p.nm, axis=2)
-            S = np.roll(S_inv_bar, d, axis=axis)
-            P = p.P_u_ref * (S / dest)
+            S_inv_bar_dest = np.roll(S_inv_bar, d, axis=axis)
+            # P = p.P_u_ref * (S / dest)
+            P = p.dt / p.dy * np.sqrt(p.g * S_bar) * (S_inv_bar_dest / dest)
 
             P[:, -1, :] = 0  # no swapping up from top row
         elif axis == 0:
-            s_bar = operators.get_average(s)
-            S_bar = np.repeat(s_bar[:, :, np.newaxis], p.nm, axis=2)
-            S = np.roll(S_bar, d, axis=axis)
-            P = p.P_lr_ref * (dest / S)
+            S_dest = np.roll(S_bar, d, axis=axis)
+            # P = p.P_lr_ref * (dest / S)
+            P = p.alpha * np.sqrt(p.g * S_bar) * S_bar * p.dt / p.dy**2 * (dest / S_dest)
 
             if d == 1:  # left
                 P[0, :, :] = 0  # no swapping left from leftmost column

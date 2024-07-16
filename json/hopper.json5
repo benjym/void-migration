@@ -14,9 +14,9 @@
     
     // material properties
     // alpha : [1.0,10.0,100.0],
-    // alpha : 1.0,
-    alpha : [0.5,1.0,2.0],  
-    repose_angle : 30,  // friction angle, degrees
+    alpha : 1.0,
+    // alpha : [0.5,1.0,2.0],  
+    repose_angle : [0,30,60],  // friction angle, degrees
     half_width : 1,  // half width of outlet in grid points
     outlet_rate : 1,  // rate of outlet opening
     P_stab : 0.5,
