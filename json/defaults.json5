@@ -26,7 +26,6 @@
     gsd_mode : 'bi', // 'mono', 'bi' or 'poly'
     large_concentration: 0.5, // concentration of large particles for bidisperse case
     s_m : 0.0005, // minimum particle size (m)
-    s_M : 0.001, // maximum particle size (m)
     nu_cs : 0.5, // critical state solid volume fraction
     alpha : 1, // ratio of horizontal to vertical swapping probability
     
@@ -57,4 +56,6 @@
 
     // diagnostics
     show_optimal_resolution : false, // should the optimal resolution be shown on the screen at runtime
+
+    gui : false
 }

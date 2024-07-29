@@ -32,5 +32,7 @@
     plot : ['nu','s'],
     videos : ['nu','s'],
     save : ['nu','s'],
-    mask_s_bar : false
+    mask_s_bar : false,
+
+    vectorized : true
 }

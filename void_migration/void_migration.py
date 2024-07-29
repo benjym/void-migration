@@ -10,6 +10,7 @@ __version__ = "0.3"
 
 import sys
 import numpy as np
+import multiprocessing
 import concurrent.futures
 from tqdm.auto import tqdm
 from itertools import product
@@ -24,11 +25,7 @@ import initial
 import stress
 
 
-def time_march(p):
-    """
-    Run the actual simulation(s) as defined in the input json file `p`.
-    """
-
+def init(p):
     plotter.set_plot_size(p)
 
     p.update_before_time_march(cycles)
@@ -73,35 +70,108 @@ def time_march(p):
     p.indices = np.arange(p.nx * (p.ny - 1) * p.nm)
     np.random.shuffle(p.indices)
 
+    return s, u, v, c, T, p_count, p_count_s, p_count_l, non_zero_nu_time, N_swap, last_swap, sigma, outlet
+
+
+def time_step(
+    p,
+    s,
+    u,
+    v,
+    c,
+    T,
+    p_count,
+    p_count_s,
+    p_count_l,
+    non_zero_nu_time,
+    N_swap,
+    last_swap,
+    sigma,
+    outlet,
+    t,
+    queue=None,
+    stop_event=None,
+):
+    if stop_event is not None and stop_event.is_set():
+        raise KeyboardInterrupt
+
+    outlet.append(0)
+    u = np.zeros_like(u)
+    v = np.zeros_like(v)
+
+    if hasattr(p, "temperature"):
+        T = thermal.update_temperature(s, T, p)
+
+    if p.calculate_stress:
+        sigma = stress.calculate_stress(s, last_swap, p)
+
+    if p.charge_discharge:
+        p = cycles.charge_discharge(p, t)
+        p_count[t], p_count_s[t], p_count_l[t], non_zero_nu_time[t] = cycles.save_quantities(p, s)
+
+    if p.vectorized:
+        u, v, s, c, T, N_swap, last_swap = motion.move_voids_fast(
+            u, v, s, sigma, last_swap, p, c=c, T=T, N_swap=N_swap
+        )
+    else:
+        u, v, s, c, T, N_swap = motion.move_voids(u, v, s, p, c=c, T=T, N_swap=N_swap)
+
+    u, v, s, c, outlet = motion.add_voids(u, v, s, p, c, outlet)
+
+    if p.close_voids:
+        u, v, s = motion.close_voids(u, v, s)
+
+    if t % p.save_inc == 0:
+        if queue is not None:
+            # print("Sent update_image message")
+            # queue.put("update_image")
+            queue.put(p.folderName + f"nu_{str(t).zfill(6)}.png")
+        plotter.update(p.x, p.y, s, u, v, c, T, sigma, last_swap, outlet, p, t)
+
+    return s, u, v, c, T, p_count, p_count_s, p_count_l, non_zero_nu_time, N_swap, last_swap, sigma, outlet
+
+
+def time_march(p, queue=None, stop_event=None):
+    """
+    Run the actual simulation(s) as defined in the input json file `p`.
+    """
+
+    s, u, v, c, T, p_count, p_count_s, p_count_l, non_zero_nu_time, N_swap, last_swap, sigma, outlet = init(p)
+
     for t in tqdm(range(1, p.nt), leave=False, desc="Time", position=p.concurrent_index + 1):
-        outlet.append(0)
-        u = np.zeros_like(u)
-        v = np.zeros_like(v)
-
-        if hasattr(p, "temperature"):
-            T = thermal.update_temperature(s, T, p)
-
-        if p.calculate_stress:
-            sigma = stress.calculate_stress(s, last_swap, p)
-
-        if p.charge_discharge:
-            p = cycles.charge_discharge(p, t)
-            p_count[t], p_count_s[t], p_count_l[t], non_zero_nu_time[t] = cycles.save_quantities(p, s)
-
-        if p.vectorized:
-            u, v, s, c, T, N_swap, last_swap = motion.move_voids_fast(
-                u, v, s, sigma, last_swap, p, c=c, T=T, N_swap=N_swap
-            )
-        else:
-            u, v, s, c, T, N_swap = motion.move_voids(u, v, s, p, c=c, T=T, N_swap=N_swap)
-
-        u, v, s, c, outlet = motion.add_voids(u, v, s, p, c, outlet)
-
-        if p.close_voids:
-            u, v, s = motion.close_voids(u, v, s)
-
-        if t % p.save_inc == 0:
-            plotter.update(p.x, p.y, s, u, v, c, T, sigma, last_swap, outlet, p, t)
+        (
+            s,
+            u,
+            v,
+            c,
+            T,
+            p_count,
+            p_count_s,
+            p_count_l,
+            non_zero_nu_time,
+            N_swap,
+            last_swap,
+            sigma,
+            outlet,
+        ) = time_step(
+            p,
+            s,
+            u,
+            v,
+            c,
+            T,
+            p_count,
+            p_count_s,
+            p_count_l,
+            non_zero_nu_time,
+            N_swap,
+            last_swap,
+            sigma,
+            outlet,
+            t,
+            queue,
+            stop_event,
+        )
 
     plotter.update(p.x, p.y, s, u, v, c, T, sigma, last_swap, outlet, p, t)
 

@@ -69,6 +69,13 @@ def IC(p):
             mask[
                 :, -1, :
             ] = True  # top row can't be filled for algorithmic reasons - could solve this if we need to
+        elif p.IC_mode == "left_column":  # just middle full to top
+            mask = np.ones([p.nx, p.ny, p.nm], dtype=bool)
+            mask[: int(p.fill_ratio * p.nx), :, :] = False
+
+            mask[
+                :, -1, :
+            ] = True  # top row can't be filled for algorithmic reasons - could solve this if we need to
         elif p.IC_mode == "empty":  # completely empty
             mask = np.ones([p.nx, p.ny, p.nm], dtype=bool)
 

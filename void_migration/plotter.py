@@ -70,6 +70,10 @@ inferno_r = cm.get_cmap("inferno_r")
 inferno_r.set_bad("w", 0.0)
 
 global fig, summary_fig, triple_fig
+global fig
+fig = plt.figure(1)
+summary_fig = plt.figure(2)
+triple_fig = plt.figure(3)
 
 replacements = {
     "repose_angle": "φ",
@@ -92,9 +96,9 @@ def set_plot_size(p):
     for i in plt.get_fignums():
         plt.close(i)
 
-    fig = plt.figure(figsize=[p.nx / _dpi, p.ny / _dpi])
-    triple_fig = plt.figure(figsize=[p.nx / _dpi, 3 * p.ny / _dpi])
-    summary_fig = plt.figure()
+    fig = plt.figure(1, figsize=[p.nx / _dpi, p.ny / _dpi])
+    triple_fig = plt.figure(2, figsize=[p.nx / _dpi, 3 * p.ny / _dpi])
+    summary_fig = plt.figure(3)
 
 
 def check_folders_exist(p):
@@ -107,6 +111,9 @@ def check_folders_exist(p):
 
 def update(x, y, s, u, v, c, T, sigma, last_swap, outlet, p, t, *args):
     check_folders_exist(p)
+
+    # if p.gui:
+    # t = 0
 
     if "s" in p.plot:
         if hasattr(p, "charge_discharge"):

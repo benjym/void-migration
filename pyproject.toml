@@ -23,6 +23,8 @@ dependencies = [
     "markdown-include",
     "mkdocs-include-markdown-plugin",
     "pre-commit",
+    "kivy",
+    "kivymd",
 ]
 
 [build-system]

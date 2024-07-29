@@ -397,6 +397,28 @@ def add_voids(u, v, s, p, c, outlet):
                         else:
                             s[i, 0, k] = np.nan
                         outlet[-1] += 1
+    elif p.add_voids == "right_outlet":  # Remove at central outlet - use this one
+        for i in range(p.nx - p.half_width * 2, p.nx):
+            for k in range(p.nm):
+                if np.random.rand() < p.outlet_rate:
+                    if not np.isnan(s[i, 0, k]):
+                        if p.refill:
+                            target_column = np.random.choice(p.half_width * 2)
+                            nu_up = np.roll(1 - np.mean(np.isnan(s[target_column, :, :]), axis=1), -1)
+                            solid = ~np.isnan(s[target_column, :, k])
+                            liquid_up = nu_up + 1 / p.nm <= p.nu_cs
+
+                            solid_indices = np.nonzero(solid & liquid_up)[0]
+                            if len(solid_indices) > 0:
+                                topmost_solid = solid_indices[-1]
+                                if topmost_solid < p.ny - 1:
+                                    s[target_column, topmost_solid + 1, k], s[i, 0, k] = (
+                                        s[i, 0, k],
+                                        s[target_column, topmost_solid + 1, k],
+                                    )
+                        else:
+                            s[i, 0, k] = np.nan
+                        outlet[-1] += 1
     # elif temp_mode == "temperature":  # Remove at central outlet
     #     for i in range(nx // 2 - half_width, nx // 2 + half_width + 1):
     #         for k in range(nm):
