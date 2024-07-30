@@ -1,5 +1,6 @@
 import sys
 import os
+import signal
 import multiprocessing
 from functools import partial
 
@@ -29,7 +30,7 @@ Config.set("kivy", "log_level", "warning")
 Logger.setLevel(LOG_LEVELS["warning"])
 
 import void_migration.params as params
-from void_migration.void_migration import time_march
+from void_migration.main import time_march
 
 
 def run_time_march(p, queue, stop_event, *args):
@@ -187,6 +188,11 @@ class VoidMigrationApp(App):
             self.stop_event.clear()
             print("Process terminated")
 
+    def on_stop(self):
+        self.stop_time_march(None)
+        # Kill the process when the app closes
+        os.kill(self.process.pid, signal.SIGTERM)
+
 
 if __name__ == "__main__":
     multiprocessing.set_start_method("spawn")
@@ -198,6 +204,5 @@ if __name__ == "__main__":
     with open(filename, "r") as f:
         data, p = params.load_file(f)
     p.concurrent_index = 0
-    # p.gui = True
 
     VoidMigrationApp(data, p).run()
