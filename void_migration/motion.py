@@ -1,8 +1,7 @@
 import numpy as np
 from numpy.typing import ArrayLike
 from scipy.ndimage import maximum_filter
-import params
-import operators
+from void_migration import operators
 
 
 def empty_up(nu_here):
@@ -96,7 +95,7 @@ def move_voids_fast(
     s: ArrayLike,
     sigma: ArrayLike,
     last_swap: ArrayLike,
-    p: params.dict_to_class,
+    p,
     diag: int = 0,
     c: None | ArrayLike = None,
     T: None | ArrayLike = None,
@@ -219,7 +218,7 @@ def move_voids(
     u: ArrayLike,
     v: ArrayLike,
     s: ArrayLike,
-    p: params.dict_to_class,
+    p,
     diag: int = 0,
     c: None | ArrayLike = None,
     T: None | ArrayLike = None,

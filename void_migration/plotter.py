@@ -5,9 +5,9 @@ import matplotlib.pyplot as plt
 from matplotlib.colors import LinearSegmentedColormap
 import matplotlib.cm as cm
 import warnings
-import operators
-import motion
-import stress
+from void_migration import operators
+from void_migration import motion
+from void_migration import stress
 
 # _video_encoding = ["-c:v", "libx265", "-preset", "fast", "-crf", "28", "-tag:v", "hvc1"] # nice small file sizes
 _video_encoding = [

@@ -28,8 +28,8 @@ from kivy.logger import Logger, LOG_LEVELS
 Config.set("kivy", "log_level", "warning")
 Logger.setLevel(LOG_LEVELS["warning"])
 
-import params
-from void_migration import time_march
+import void_migration.params as params
+from void_migration.void_migration import time_march
 
 
 def run_time_march(p, queue, stop_event, *args):

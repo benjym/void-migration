@@ -10,19 +10,26 @@ __version__ = "0.3"
 
 import sys
 import numpy as np
-import multiprocessing
 import concurrent.futures
 from tqdm.auto import tqdm
 from itertools import product
 
 # from numba import jit, njit
-import params
-import plotter
-import thermal
-import motion
-import cycles
-import initial
-import stress
+from void_migration import params
+from void_migration import plotter
+from void_migration import thermal
+from void_migration import motion
+from void_migration import cycles
+from void_migration import initial
+from void_migration import stress
+
+# import void_migration.params as params
+# import void_migration.plotter as plotter
+# import void_migration.thermal as thermal
+# import void_migration.motion as motion
+# import void_migration.cycles as cycles
+# import void_migration.initial as initial
+# import void_migration.stress as stress
 
 
 def init(p, queue=None):

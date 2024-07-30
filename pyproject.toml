@@ -1,6 +1,6 @@
 [project]
 name = "void_migration"
-version = "0.3"
+version = "0.4"
 requires-python = ">=3.11"
 authors = [
   {name = "Benjy Marks", email = "benjy.marks@sydney.edu.au"},

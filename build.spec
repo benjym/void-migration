@@ -29,7 +29,7 @@ exe = EXE(
     a.binaries,
     a.datas,
     [],
-    name='gui',
+    name='Void Migration',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
@@ -45,7 +45,7 @@ exe = EXE(
 )
 app = BUNDLE(
     exe,
-    name='gui.app',
-    icon=None,
+    name='void_migration.app',
+    icon='assets/favicon.png',
     bundle_identifier=None,
 )
