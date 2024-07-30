@@ -5,6 +5,9 @@ on: [push]
 jobs:
   pyinstaller-build:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        arch: [x86_64, arm64]
     steps:
       - uses: actions/checkout@v3    
       - uses: actions/setup-python@v4
@@ -12,9 +15,9 @@ jobs:
           python-version: 3.11
       - run: sudo apt-get install -y libmtdev1 xvfb
       - run: pip install -e .
-      - run: xvfb-run -a pyinstaller build.spec
+      - run: xvfb-run -a pyinstaller build.spec --distpath dist/${{ matrix.arch }}
 
       - uses: actions/upload-artifact@v4
         with:
-          name: Linux App
-          path: dist/VoidMigration
+          name: Linux App ${{ matrix.arch }}
+          path: dist/${{ matrix.arch }}/VoidMigration
