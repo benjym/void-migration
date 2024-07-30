@@ -10,12 +10,14 @@ jobs:
       - uses: actions/setup-python@v4
         with:
           python-version: 3.11
-      - run: sudo apt-get install -y libmtdev1
+      - run: sudo apt-get install -y libmtdev1 xvfb
       - run: pip install -e .
-      - name: Create Executable
-        uses: martin005/pyinstaller-action@v1.2.0
-        with:
-          python_ver: '3.11'
-          spec: 'build.spec'
-          upload_exe_with_name: 'Void Migration'
-          options: --onefile, --name "Void Migration", --windowed, -y
+      - run: xvfb-run -a pyinstaller bundle.spec
+
+      # - name: Create Executable
+      #   uses: martin005/pyinstaller-action@v1.2.0
+      #   with:
+      #     python_ver: '3.11'
+      #     spec: 'build.spec'
+      #     upload_exe_with_name: 'Void Migration'
+      #     options: --onefile, --name "Void Migration", --windowed, -y
