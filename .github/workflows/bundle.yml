@@ -13,7 +13,7 @@ jobs:
       - run: pip install toml-to-requirements
       - run: toml-to-req --toml-file pyproject.toml
       - name: Create Executable
-        uses: artin005/pyinstaller-action@v1.2.0
+        uses: martin005/pyinstaller-action@v1.2.0
         with:
           python_ver: '3.11'
           spec: 'build.spec'
