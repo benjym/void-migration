@@ -1,0 +1,22 @@
+name: Bundle for Linux
+
+on: [push]
+
+jobs:
+  pyinstaller-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3    
+      - uses: actions/setup-python@v4
+        with:
+          python-version: 3.11
+      - run: pip install toml-to-requirements
+      - run: toml-to-req --toml-file pyproject.toml
+      - name: Create Executable
+        uses: artin005/pyinstaller-action@v1.2.0
+        with:
+          python_ver: '3.11'
+          spec: 'build.spec'
+          requirements: 'requirements.txt'
+          upload_exe_with_name: 'Void Migration'
+          options: --onefile, --name "Void Migration", --windowed, -y

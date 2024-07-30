@@ -25,6 +25,7 @@ dependencies = [
     "pre-commit",
     "kivy",
     "kivymd",
+    "pyinstaller",
 ]
 
 [build-system]

@@ -3,6 +3,9 @@ import os
 import multiprocessing
 from functools import partial
 
+os.environ["KIVY_NO_ARGS"] = "1"
+os.environ["KIVY_NO_CONSOLELOG"] = "1"
+
 from kivy.uix.button import Button
 from kivy.uix.image import Image
 from kivy.clock import Clock
@@ -17,12 +20,9 @@ from kivymd.uix.menu import MDDropdownMenu as DropdownMenu
 from kivymd.uix.dropdownitem import MDDropDownItem as DropDownItem
 from kivymd.uix.button.button import MDRaisedButton as Button
 from kivy.cache import Cache
-
 from kivy.config import Config
 from kivy.logger import Logger, LOG_LEVELS
 
-# Suppress console log
-os.environ["KIVY_NO_CONSOLELOG"] = "1"
 
 # Set log level to warning
 Config.set("kivy", "log_level", "warning")
@@ -189,7 +189,13 @@ class VoidMigrationApp(App):
 
 
 if __name__ == "__main__":
-    with open(sys.argv[1], "r") as f:
+    multiprocessing.set_start_method("spawn")
+    multiprocessing.freeze_support()
+    if len(sys.argv) < 2:
+        filename = "json/gui.json5"
+    else:
+        filename = sys.argv[1]
+    with open(filename, "r") as f:
         data, p = params.load_file(f)
     p.concurrent_index = 0
     # p.gui = True
