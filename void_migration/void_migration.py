@@ -25,7 +25,7 @@ import initial
 import stress
 
 
-def init(p):
+def init(p, queue=None):
     plotter.set_plot_size(p)
 
     p.update_before_time_march(cycles)
@@ -64,7 +64,7 @@ def init(p):
     outlet = []
     if len(p.save) > 0:
         plotter.save_coordinate_system(p.x, p.y, p)
-    plotter.update(p.x, p.y, s, u, v, c, T, sigma, last_swap, outlet, p, 0)
+    plotter.update(p.x, p.y, s, u, v, c, T, sigma, last_swap, outlet, p, 0, queue)
 
     N_swap = None
     p.indices = np.arange(p.nx * (p.ny - 1) * p.nm)
@@ -122,11 +122,7 @@ def time_step(
         u, v, s = motion.close_voids(u, v, s)
 
     if t % p.save_inc == 0:
-        if queue is not None:
-            # print("Sent update_image message")
-            # queue.put("update_image")
-            queue.put(p.folderName + f"nu_{str(t).zfill(6)}.png")
-        plotter.update(p.x, p.y, s, u, v, c, T, sigma, last_swap, outlet, p, t)
+        plotter.update(p.x, p.y, s, u, v, c, T, sigma, last_swap, outlet, p, t, queue)
 
     return s, u, v, c, T, p_count, p_count_s, p_count_l, non_zero_nu_time, N_swap, last_swap, sigma, outlet
 
@@ -136,7 +132,9 @@ def time_march(p, queue=None, stop_event=None):
     Run the actual simulation(s) as defined in the input json file `p`.
     """
 
-    s, u, v, c, T, p_count, p_count_s, p_count_l, non_zero_nu_time, N_swap, last_swap, sigma, outlet = init(p)
+    s, u, v, c, T, p_count, p_count_s, p_count_l, non_zero_nu_time, N_swap, last_swap, sigma, outlet = init(
+        p, queue
+    )
 
     for t in tqdm(range(1, p.nt), leave=False, desc="Time", position=p.concurrent_index + 1):
         (
@@ -173,7 +171,7 @@ def time_march(p, queue=None, stop_event=None):
             stop_event,
         )
 
-    plotter.update(p.x, p.y, s, u, v, c, T, sigma, last_swap, outlet, p, t)
+    plotter.update(p.x, p.y, s, u, v, c, T, sigma, last_swap, outlet, p, t, queue)
 
 
 def run_simulation(sim_with_index):

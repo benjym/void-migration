@@ -109,11 +109,12 @@ def check_folders_exist(p):
             os.makedirs(p.folderName + "data/")
 
 
-def update(x, y, s, u, v, c, T, sigma, last_swap, outlet, p, t, *args):
+def update(x, y, s, u, v, c, T, sigma, last_swap, outlet, p, t, queue, *args):
     check_folders_exist(p)
 
-    # if p.gui:
-    # t = 0
+    if p.gui:
+        t = 0
+        queue.put(str(t).zfill(6))
 
     if "s" in p.plot:
         if hasattr(p, "charge_discharge"):

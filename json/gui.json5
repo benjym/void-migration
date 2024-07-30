@@ -35,6 +35,7 @@
     t_f : 10,  // final time
     
     // saving
+    save_inc : 1,
     // saves : 100,  // how often to save
     plot : ['nu', 's', 'stress'],  // what to plot
     // videos : ['nu', 's', 'stress'],  // what to save videos of
@@ -43,4 +44,19 @@
     // testing area
     // close_voids : false,
     // vectorize : false
+    view : 'nu',
+
+    gui : {
+        nx : {min: 10, max: 100, step: 1, dtype: 'int', 'title': 'width in grid points'},
+        aspect_ratio_y : {min: 0.2, max: 5, step: 0.1, dtype: 'float', 'title': 'aspect ratio'},
+        refill : {dtype: 'bool', 'title': 'refill on discharge'},
+        s_m : {min: 0.001, max: 0.1, step: 0.001, dtype: 'float', 'title': 'min particle size (m)'},
+        s_M : {min: 0.001, max: 0.1, step: 0.001, dtype: 'float', 'title': 'max particle size (m)'},
+        gsd_mode : {dtype: 'select', options: ['mono', 'bi'], 'title': 'grain size distribution'},
+        nu_cs : {min: 0.1, max: 1.0, step: 0.1, dtype: 'float', 'title': 'critical solid fraction'},
+        IC_mode : {dtype: 'select', options: ['top', 'random'], 'title': 'initial condition'},
+        nu_fill : {min: 0.1, max: 1.0, step: 0.1, dtype: 'float', 'title': 'fill solid fraction'},
+        fill_ratio : {min: 0.1, max: 1.0, step: 0.1, dtype: 'float', 'title': 'fill ratio'},
+        view : {dtype: 'select', options: ['nu', 's', 'stress'], 'title': 'View'},
+    }
 }
