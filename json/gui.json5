@@ -37,7 +37,7 @@
     // saving
     save_inc : 1,
     // saves : 100,  // how often to save
-    plot : ['nu', 's', 'stress'],  // what to plot
+    plot : ['nu', 's', 'pressure', 'deviatoric'],  // what to plot
     // videos : ['nu', 's', 'stress'],  // what to save videos of
     // save : ['outlet'],
 
@@ -57,6 +57,6 @@
         IC_mode : {dtype: 'select', options: ['top', 'random'], 'title': 'initial condition'},
         nu_fill : {min: 0.1, max: 1.0, step: 0.1, dtype: 'float', 'title': 'fill solid fraction'},
         fill_ratio : {min: 0.1, max: 1.0, step: 0.1, dtype: 'float', 'title': 'fill ratio'},
-        view : {dtype: 'select', options: ['nu', 's', 'stress'], 'title': 'View'},
+        view : {dtype: 'select', options: ['nu', 's', 'pressure', 'deviatoric'], 'title': 'View'},
     }
 }

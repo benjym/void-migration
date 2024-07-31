@@ -70,7 +70,6 @@ inferno_r = cm.get_cmap("inferno_r")
 inferno_r.set_bad("w", 0.0)
 
 global fig, summary_fig, triple_fig
-global fig
 fig = plt.figure(1)
 summary_fig = plt.figure(2)
 triple_fig = plt.figure(3)
@@ -109,51 +108,58 @@ def check_folders_exist(p):
             os.makedirs(p.folderName + "data/")
 
 
-def update(x, y, s, u, v, c, T, sigma, last_swap, outlet, p, t, queue, *args):
+def update(p, state, t, queue, *args):
+    s, u, v, c, T, p_count, p_count_s, p_count_l, non_zero_nu_time, N_swap, last_swap, sigma, outlet = state
+
     check_folders_exist(p)
 
-    if p.gui:
+    if p.gui is not None:
         t = 0
-        queue.put(str(t).zfill(6))
+        if queue is not None:
+            queue.put(str(t).zfill(6))
 
     if "s" in p.plot:
         if hasattr(p, "charge_discharge"):
-            plot_s(x, y, s, p, t, *args)
+            plot_s(s, p, t, *args)
         else:
-            plot_s(x, y, s, p, t)
+            plot_s(s, p, t)
     if "nu" in p.plot:
-        plot_nu(x, y, s, p, t)
+        plot_nu(s, p, t)
     if "rel_nu" in p.plot:
-        plot_relative_nu(x, y, s, p, t)
+        plot_relative_nu(s, p, t)
     if "U_mag" in p.plot:
-        plot_u(x, y, s, u, v, p, t)
+        plot_u(s, u, v, p, t)
     if "c" in p.plot:
-        plot_c(x, y, s, c, p, t)
+        plot_c(s, c, p, t)
     if "temperature" in p.plot:
-        plot_T(x, y, s, T, p, t)
+        plot_T(s, T, p, t)
     # if "density_profile" in p.plot:
     #     plot_profile(x, nu_time_x, p)
     if "permeability" in p.plot:
-        plot_permeability(x, y, s, p, t)
+        plot_permeability(s, p, t)
     if "stable" in p.plot:
-        plot_stable(x, y, s, p, t)
+        plot_stable(s, p, t)
     if "h" in p.plot:
-        plot_h(x, y, s, p, t)
+        plot_h(s, p, t)
     if "stress" in p.plot:
-        plot_stress(x, y, s, sigma, last_swap, p, t)
+        plot_stress(s, sigma, last_swap, p, t)
     if "sigma_yy" in p.plot:
-        plot_sigma_yy(x, y, s, sigma, last_swap, p, t)
+        plot_sigma_yy(s, sigma, last_swap, p, t)
+    if "pressure" in p.plot:
+        plot_pressure(s, sigma, last_swap, p, t)
+    if "deviatoric" in p.plot:
+        plot_deviatoric(s, sigma, last_swap, p, t)
 
     if "s" in p.save:
-        save_s(x, y, s, p, t)
+        save_s(s, p, t)
     if "nu" in p.save:
-        save_nu(x, y, s, p, t)
+        save_nu(s, p, t)
     if "rel_nu" in p.save:
-        save_relative_nu(x, y, s, p, t)
+        save_relative_nu(s, p, t)
     # if "U_mag" in p.save:
-    #     save_u(x, y, s, u, v, p, t)
+    #     save_u(s, u, v, p, t)
     if "permeability" in p.save:
-        save_permeability(x, y, s, p, t)
+        save_permeability(s, p, t)
     if "concentration" in p.save:
         save_c(c, p.folderName, t)
     if "outlet" in p.save:
@@ -190,7 +196,7 @@ def plot_u_time(y, U, nu_time, p):
     np.save(p.folderName + "data/nu.npy", np.mean(nu_time[p.nt // 2 :], axis=0))
 
 
-def plot_stable(x, y, s, p, t):
+def plot_stable(s, p, t):
     plt.figure(fig)
 
     slope = np.zeros([p.nx, p.ny, 2])
@@ -214,10 +220,10 @@ def plot_stable(x, y, s, p, t):
         [empty, "empty"],
     ]:
         plt.clf()
-        plt.pcolormesh(x, y, f[0].T, cmap=inferno)
+        plt.pcolormesh(p.x, p.y, f[0].T, cmap=inferno)
         plt.axis("off")
-        plt.xlim(x[0], x[-1])
-        plt.ylim(y[0], y[-1])
+        plt.xlim(p.x[0], p.x[-1])
+        plt.ylim(p.y[0], p.y[-1])
         plt.subplots_adjust(left=0, right=1, bottom=0, top=1)
         plt.savefig(p.folderName + f[1] + f"_{t}.png")
 
@@ -248,77 +254,140 @@ def plot_s_bar(y, s_bar, nu_time, p):
     plt.savefig(p.folderName + "nu.png")
 
 
-def plot_sigma_yy(x, y, s, sigma, last_swap, p, t):
+def plot_sigma_xx(s, sigma, last_swap, p, t):
+    if sigma is None:
+        sigma = stress.calculate_stress(s, last_swap, p)
+    sigma_xx = stress.get_sigma_xx(sigma, p)
+    sigma_xx = np.ma.masked_where(sigma_xx == 0.0, sigma_xx)
+    plt.figure(fig)
+    plt.clf()
+    plt.pcolormesh(p.x, p.y, sigma_xx.T)
+    plt.axis("off")
+    plt.xlim(p.x[0], p.x[-1])
+    plt.ylim(p.y[0], p.y[-1])
+
+    plt.subplots_adjust(left=0, right=1, bottom=0, top=1, wspace=0, hspace=0)
+    plt.savefig(p.folderName + "sigma_xx_" + str(t).zfill(6) + ".png")
+
+
+def plot_sigma_yy(s, sigma, last_swap, p, t):
     if sigma is None:
         sigma = stress.calculate_stress(s, last_swap, p)
     sigma_yy = np.ma.masked_where(sigma[:, :, 1] == 0.0, sigma[:, :, 1])
     plt.figure(fig)
     plt.clf()
-    plt.pcolormesh(x, y, sigma_yy.T)
+    plt.pcolormesh(p.x, p.y, sigma_yy.T)
     plt.axis("off")
-    plt.xlim(x[0], x[-1])
-    plt.ylim(y[0], y[-1])
+    plt.xlim(p.x[0], p.x[-1])
+    plt.ylim(p.y[0], p.y[-1])
 
     plt.subplots_adjust(left=0, right=1, bottom=0, top=1, wspace=0, hspace=0)
     plt.savefig(p.folderName + "sigma_yy_" + str(t).zfill(6) + ".png")
 
 
-def plot_rel_mu(x, y, s, sigma, last_swap, p, t):
+def plot_sigma_xy(s, sigma, last_swap, p, t):
+    if sigma is None:
+        sigma = stress.calculate_stress(s, last_swap, p)
+    sigma_xy = np.ma.masked_where(sigma[:, :, 0] == 0.0, sigma[:, :, 0])
+    plt.figure(fig)
+    plt.clf()
+    plt.pcolormesh(p.x, p.y, sigma_xy.T)
+    plt.axis("off")
+    plt.xlim(p.x[0], p.x[-1])
+    plt.ylim(p.y[0], p.y[-1])
+
+    plt.subplots_adjust(left=0, right=1, bottom=0, top=1, wspace=0, hspace=0)
+    plt.savefig(p.folderName + "sigma_xy_" + str(t).zfill(6) + ".png")
+
+
+def plot_rel_mu(s, sigma, last_swap, p, t):
     if sigma is None:
         sigma = stress.calculate_stress(s, last_swap, p)
     mu = np.ma.masked_where(sigma[:, :, 2] == 0.0, sigma[:, :, 2])
     plt.figure(fig)
     plt.clf()
-    plt.pcolormesh(x, y, (mu / p.mu).T, vmin)
+    plt.pcolormesh(p.x, p.y, (mu / p.mu).T, cmap=bwr, vmin=0, vmax=2)
     plt.axis("off")
-    plt.xlim(x[0], x[-1])
-    plt.ylim(y[0], y[-1])
+    plt.xlim(p.x[0], p.x[-1])
+    plt.ylim(p.y[0], p.y[-1])
 
     plt.subplots_adjust(left=0, right=1, bottom=0, top=1, wspace=0, hspace=0)
-    plt.savefig(p.folderName + "sigma_yy_" + str(t).zfill(6) + ".png")
+    plt.savefig(p.folderName + "rel_mu_" + str(t).zfill(6) + ".png")
 
 
-def plot_stress(x, y, s, sigma, last_swap, p, t):
+def plot_stress(s, sigma, last_swap, p, t):
     if sigma is None:
         sigma = stress.calculate_stress(s, last_swap, p)
     plt.figure(triple_fig)
     plt.clf()
     plt.subplot(311)
     plt.pcolormesh(
-        x,
-        y,
+        p.x,
+        p.y,
         sigma[:, :, 0].T,
         cmap="bwr",
         vmin=-np.amax(np.abs(sigma[:, :, 0])),
         vmax=np.amax(np.abs(sigma[:, :, 0])),
     )
     plt.axis("off")
-    plt.xlim(x[0], x[-1])
-    plt.ylim(y[0], y[-1])
+    plt.xlim(p.x[0], p.x[-1])
+    plt.ylim(p.y[0], p.y[-1])
     # plt.colorbar()
 
     plt.subplot(312)
-    plt.pcolormesh(x, y, sigma[:, :, 1].T)
+    plt.pcolormesh(p.x, p.y, sigma[:, :, 1].T)
     plt.axis("off")
-    plt.xlim(x[0], x[-1])
-    plt.ylim(y[0], y[-1])
+    plt.xlim(p.x[0], p.x[-1])
+    plt.ylim(p.y[0], p.y[-1])
     # plt.colorbar()
 
     plt.subplot(313)
-    plt.pcolormesh(x, y, sigma[:, :, 2].T, vmin=0, vmax=p.mu)
+    plt.pcolormesh(p.x, p.y, sigma[:, :, 2].T, vmin=0, vmax=p.mu)
     plt.axis("off")
-    plt.xlim(x[0], x[-1])
-    plt.ylim(y[0], y[-1])
+    plt.xlim(p.x[0], p.x[-1])
+    plt.ylim(p.y[0], p.y[-1])
     # plt.colorbar()
 
     plt.subplots_adjust(left=0, right=1, bottom=0, top=1, wspace=0, hspace=0)
     plt.savefig(p.folderName + "stress_" + str(t).zfill(6) + ".png")
 
 
-def save_coordinate_system(x, y, p):
+def plot_pressure(s, sigma, last_swap, p, t):
+    if sigma is None:
+        sigma = stress.calculate_stress(s, last_swap, p)
+    pressure = stress.get_pressure(sigma, p)
+    pressure = np.ma.masked_where(pressure == 0.0, pressure)
+    plt.figure(fig)
+    plt.clf()
+    plt.pcolormesh(p.x, p.y, pressure.T)
+    plt.axis("off")
+    plt.xlim(p.x[0], p.x[-1])
+    plt.ylim(p.y[0], p.y[-1])
+
+    plt.subplots_adjust(left=0, right=1, bottom=0, top=1, wspace=0, hspace=0)
+    plt.savefig(p.folderName + "pressure_" + str(t).zfill(6) + ".png")
+
+
+def plot_deviatoric(s, sigma, last_swap, p, t):
+    if sigma is None:
+        sigma = stress.calculate_stress(s, last_swap, p)
+    q = stress.get_deviatoric(sigma, p)
+    q = np.ma.masked_where(q == 0.0, q)
+    plt.figure(fig)
+    plt.clf()
+    plt.pcolormesh(p.x, p.y, q.T)
+    plt.axis("off")
+    plt.xlim(p.x[0], p.x[-1])
+    plt.ylim(p.y[0], p.y[-1])
+
+    plt.subplots_adjust(left=0, right=1, bottom=0, top=1, wspace=0, hspace=0)
+    plt.savefig(p.folderName + "deviatoric_" + str(t).zfill(6) + ".png")
+
+
+def save_coordinate_system(p):
     check_folders_exist(p)
-    np.savetxt(p.folderName + "data/x.csv", x, delimiter=",")
-    np.savetxt(p.folderName + "data/y.csv", y, delimiter=",")
+    np.savetxt(p.folderName + "data/x.csv", p.x, delimiter=",")
+    np.savetxt(p.folderName + "data/y.csv", p.y, delimiter=",")
 
 
 def c_d_saves(p, non_zero_nu_time, *args):
@@ -340,7 +409,7 @@ def kozeny_carman(s):
     return permeability
 
 
-def plot_permeability(x, y, s, p, t):
+def plot_permeability(s, p, t):
     """
     Calculate and save the permeability of the domain at time t.
     """
@@ -348,20 +417,20 @@ def plot_permeability(x, y, s, p, t):
 
     plt.figure(fig)
     plt.clf()
-    plt.pcolormesh(x, y, permeability.T, cmap=inferno)
+    plt.pcolormesh(p.x, p.y, permeability.T, cmap=inferno)
     plt.axis("off")
-    plt.xlim(x[0], x[-1])
-    plt.ylim(y[0], y[-1])
+    plt.xlim(p.x[0], p.x[-1])
+    plt.ylim(p.y[0], p.y[-1])
     plt.subplots_adjust(left=0, right=1, bottom=0, top=1)
     plt.savefig(p.folderName + "permeability_" + str(t).zfill(6) + ".png")
 
 
-def save_permeability(x, y, s, p, t):
+def save_permeability(s, p, t):
     permeability = kozeny_carman(s)
     np.savetxt(p.folderName + "data/permeability_" + str(t).zfill(6) + ".csv", permeability, delimiter=",")
 
 
-def plot_s(x, y, s, p, t, *args):
+def plot_s(s, p, t, *args):
     plt.figure(fig)
     plt.clf()
     with warnings.catch_warnings():
@@ -370,17 +439,17 @@ def plot_s(x, y, s, p, t, *args):
     s_plot = np.ma.masked_where(np.isnan(s_plot), s_plot)
 
     if hasattr(p, "charge_discharge") and p.gsd_mode == "mono":
-        plt.pcolormesh(x, y, s_plot, cmap=cmap, vmin=args[0][0], vmax=args[0][1])
+        plt.pcolormesh(p.x, p.y, s_plot, cmap=cmap, vmin=args[0][0], vmax=args[0][1])
     else:
-        plt.pcolormesh(x, y, s_plot, cmap=orange_blue_cmap, vmin=p.s_m, vmax=p.s_M)
+        plt.pcolormesh(p.x, p.y, s_plot, cmap=orange_blue_cmap, vmin=p.s_m, vmax=p.s_M)
         # plt.colorbar()
 
     if p.internal_geometry:
         for i in p.internal_geometry["perf_pts"]:
-            plt.plot([x[i], x[i]], [y[0], y[-1]], "k--", linewidth=10)
+            plt.plot([p.x[i], p.x[i]], [p.y[0], p.y[-1]], "k--", linewidth=10)
     plt.axis("off")
-    plt.xlim(x[0], x[-1])
-    plt.ylim(y[0], y[-1])
+    plt.xlim(p.x[0], p.x[-1])
+    plt.ylim(p.y[0], p.y[-1])
     ticks = np.linspace(p.s_m, p.s_M, 3, endpoint=True)
     plt.subplots_adjust(left=0, right=1, bottom=0, top=1)
     if hasattr(p, "plot_colorbar"):
@@ -388,11 +457,11 @@ def plot_s(x, y, s, p, t, *args):
     plt.savefig(p.folderName + "s_" + str(t).zfill(6) + ".png")
 
 
-def save_s(x, y, s, p, t):
+def save_s(s, p, t):
     np.save(p.folderName + "data/s_" + str(t).zfill(6) + ".npy", operators.get_average(s))
 
 
-def plot_nu(x, y, s, p, t):
+def plot_nu(s, p, t):
     plt.figure(fig)
     nu = 1 - np.mean(np.isnan(s), axis=2).T
     nu = np.ma.masked_where(nu == 0, nu)
@@ -400,29 +469,29 @@ def plot_nu(x, y, s, p, t):
         nu = np.ma.masked_where(p.boundary.T, nu)
     plt.clf()
 
-    plt.pcolormesh(x, y, nu, cmap=inferno_r, vmin=0, vmax=1)
+    plt.pcolormesh(p.x, p.y, nu, cmap=inferno_r, vmin=0, vmax=1)
     if p.internal_geometry:
         if p.internal_geometry["perf_plate"]:
             for i in p.internal_geometry["perf_pts"]:
-                plt.plot([x[i], x[i]], [y[0], y[-1]], "k--", linewidth=10)
+                plt.plot([p.x[i], p.x[i]], [p.y[0], p.y[-1]], "k--", linewidth=10)
     plt.axis("off")
-    plt.xlim(x[0], x[-1])
-    plt.ylim(y[0], y[-1])
+    plt.xlim(p.x[0], p.x[-1])
+    plt.ylim(p.y[0], p.y[-1])
     plt.subplots_adjust(left=0, right=1, bottom=0, top=1)
     if hasattr(p, "plot_colorbar"):
         plt.colorbar(shrink=0.8, location="top", pad=0.01)
     plt.savefig(p.folderName + "nu_" + str(t).zfill(6) + ".png")
 
 
-def save_nu(x, y, s, p, t):
+def save_nu(s, p, t):
     np.save(p.folderName + "data/nu_" + str(t).zfill(6) + ".npy", operators.get_solid_fraction(s))
 
 
-def save_relative_nu(x, y, s, p, t):
+def save_relative_nu(s, p, t):
     np.save(p.folderName + "data/nu_" + str(t).zfill(6) + ".npy", operators.get_solid_fraction(s) / p.nu_cs)
 
 
-def plot_relative_nu(x, y, s, p, t):
+def plot_relative_nu(s, p, t):
     plt.figure(fig)
     nu = 1 - np.mean(np.isnan(s), axis=2).T
     nu /= p.nu_cs
@@ -430,21 +499,21 @@ def plot_relative_nu(x, y, s, p, t):
         nu = np.ma.masked_where(p.boundary.T, nu)
     nu = np.ma.masked_where(nu == 0, nu)
     plt.clf()
-    plt.pcolormesh(x, y, nu, cmap=bwr, vmin=0, vmax=2)
+    plt.pcolormesh(p.x, p.y, nu, cmap=bwr, vmin=0, vmax=2)
     if p.internal_geometry:
         if p.internal_geometry["perf_plate"]:
             for i in p.internal_geometry["perf_pts"]:
-                plt.plot([x[i], x[i]], [y[0], y[-1]], "k--", linewidth=10)
+                plt.plot([p.x[i], p.x[i]], [p.y[0], p.y[-1]], "k--", linewidth=10)
     plt.axis("off")
-    plt.xlim(x[0], x[-1])
-    plt.ylim(y[0], y[-1])
+    plt.xlim(p.x[0], p.x[-1])
+    plt.ylim(p.y[0], p.y[-1])
     plt.subplots_adjust(left=0, right=1, bottom=0, top=1)
     if hasattr(p, "plot_colorbar"):
         plt.colorbar(shrink=0.8, location="top", pad=0.01)  # ,ticks = ticks)
     plt.savefig(p.folderName + "rel_nu_" + str(t).zfill(6) + ".png")
 
 
-def plot_u(x, y, s, u, v, p, t):
+def plot_u(s, u, v, p, t):
     plt.figure(fig)
     # mask = mean(isnan(s),axis=2) > 0.95
     # u = ma.masked_where(mask,u/sum(isnan(s),axis=2)).T
@@ -459,48 +528,50 @@ def plot_u(x, y, s, u, v, p, t):
     plt.clf()
     # plt.quiver(X,Y,u,v)
     # print(u)
-    plt.pcolormesh(x, y, u, vmin=-np.amax(np.abs(u)), vmax=np.amax(np.abs(u)), cmap="bwr")
+    plt.pcolormesh(p.x, p.y, u, vmin=-np.amax(np.abs(u)), vmax=np.amax(np.abs(u)), cmap="bwr")
     if p.internal_geometry:
         if p.internal_geometry["perf_plate"]:
             for i in p.internal_geometry["perf_pts"]:
-                plt.plot([x[i], x[i]], [y[0], y[-1]], "k--", linewidth=10)
+                plt.plot([p.x[i], p.x[i]], [p.y[0], p.y[-1]], "k--", linewidth=10)
     plt.axis("off")
-    plt.xlim(x[0], x[-1])
-    plt.ylim(y[0], y[-1])
+    plt.xlim(p.x[0], p.x[-1])
+    plt.ylim(p.y[0], p.y[-1])
     plt.subplots_adjust(left=0.0, right=1.0, bottom=0.0, top=1.0)
     # plt.colorbar()
     plt.savefig(p.folderName + "u_" + str(t).zfill(6) + ".png")
 
     plt.clf()
     # plt.quiver(X,Y,u,v)
-    plt.pcolormesh(x, y, v, vmin=-np.amax(np.abs(v)), vmax=np.amax(np.abs(v)), cmap="bwr")
+    plt.pcolormesh(p.x, p.y, v, vmin=-np.amax(np.abs(v)), vmax=np.amax(np.abs(v)), cmap="bwr")
     if p.internal_geometry:
         if p.internal_geometry["perf_plate"]:
             for i in p.internal_geometry["perf_pts"]:
-                plt.plot([x[i], x[i]], [y[0], y[-1]], "k--", linewidth=10)
+                plt.plot([p.x[i], p.x[i]], [p.y[0], p.y[-1]], "k--", linewidth=10)
     plt.axis("off")
-    plt.xlim(x[0], x[-1])
-    plt.ylim(y[0], y[-1])
+    plt.xlim(p.x[0], p.x[-1])
+    plt.ylim(p.y[0], p.y[-1])
     plt.subplots_adjust(left=0, right=1, bottom=0, top=1)
     plt.savefig(p.folderName + "v_" + str(t).zfill(6) + ".png")
 
     U = np.sqrt(u**2 + v**2)
     plt.clf()
-    plt.pcolormesh(x, y, np.ma.masked_where(p.boundary.T, U), vmin=0, vmax=np.amax(np.abs(U)), cmap=inferno)
+    plt.pcolormesh(
+        p.x, p.y, np.ma.masked_where(p.boundary.T, U), vmin=0, vmax=np.amax(np.abs(U)), cmap=inferno
+    )
     if p.internal_geometry:
         if p.internal_geometry["perf_plate"]:
             for i in p.internal_geometry["perf_pts"]:
-                plt.plot([x[i], x[i]], [y[0], y[-1]], "k--", linewidth=10)
+                plt.plot([p.x[i], p.x[i]], [p.y[0], p.y[-1]], "k--", linewidth=10)
     plt.axis("off")
-    plt.xlim(x[0], x[-1])
-    plt.ylim(y[0], y[-1])
+    plt.xlim(p.x[0], p.x[-1])
+    plt.ylim(p.y[0], p.y[-1])
     plt.subplots_adjust(left=0, right=1, bottom=0, top=1)
     if hasattr(p, "plot_colorbar"):
         plt.colorbar(shrink=0.8, location="top", pad=0.01)  # ,ticks = ticks)
     plt.savefig(p.folderName + "U_mag_" + str(t).zfill(6) + ".png")
 
 
-def plot_c(x, y, s, c, p, t):
+def plot_c(s, c, p, t):
     # print(np.unique(c))
     plt.figure(fig)
 
@@ -509,15 +580,15 @@ def plot_c(x, y, s, c, p, t):
 
     plt.clf()
     plt.pcolormesh(
-        x, y, np.ma.masked_where(mask, np.nanmean(c, axis=2)).T, cmap=inferno, vmin=0, vmax=p.num_cycles
+        p.x, p.y, np.ma.masked_where(mask, np.nanmean(c, axis=2)).T, cmap=inferno, vmin=0, vmax=p.num_cycles
     )
     if p.internal_geometry:
         if p.internal_geometry["perf_plate"]:
             for i in p.internal_geometry["perf_pts"]:
-                plt.plot([x[i], x[i]], [y[0], y[-1]], "k--", linewidth=10)
+                plt.plot([p.x[i], p.x[i]], [p.y[0], p.y[-1]], "k--", linewidth=10)
     plt.axis("off")
-    plt.xlim(x[0], x[-1])
-    plt.ylim(y[0], y[-1])
+    plt.xlim(p.x[0], p.x[-1])
+    plt.ylim(p.y[0], p.y[-1])
     plt.subplots_adjust(left=0, right=1, bottom=0, top=1)
     plt.savefig(p.folderName + "c_" + str(t).zfill(6) + ".png")
 
@@ -550,28 +621,28 @@ def plot_profile(x, nu_time_x, p):
     plt.savefig(p.folderName + "collapse_profile.png")
 
 
-def plot_T(x, y, s, T, p, t):
+def plot_T(s, T, p, t):
     plt.figure(fig)
 
     nm = s.shape[2]
     mask = np.sum(np.isnan(s), axis=2) > 0.95 * nm
     plt.clf()
     plt.pcolormesh(
-        x,
-        y,
+        p.x,
+        p.y,
         np.ma.masked_where(mask, np.nanmean(T, axis=2)).T,
         cmap=bwr,
         vmin=p.boundary_temperature,
         vmax=p.inlet_temperature,
     )
     plt.axis("off")
-    plt.xlim(x[0], x[-1])
-    plt.ylim(y[0], y[-1])
+    plt.xlim(p.x[0], p.x[-1])
+    plt.ylim(p.y[0], p.y[-1])
     plt.subplots_adjust(left=0, right=1, bottom=0, top=1)
     plt.savefig(p.folderName + "T_" + str(t).zfill(6) + ".png")
 
 
-def plot_h(x, y, s, p, t):
+def plot_h(s, p, t):
     """
     Show the relative 'height' of the grains in each cell. Used for diagnostic purposes only, otherwise not that useful.
     """

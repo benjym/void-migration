@@ -45,7 +45,7 @@ def calculate_stress(s, last_swap, p):
             K = K_p * (K_a / K_p) ** ((a + 1) / 2)
             stress_fraction = 1 - K
 
-    sigma = np.zeros([p.nx, p.ny, 3])  # sigma_xy, sigma_yy, mu
+    sigma = np.zeros([p.nx, p.ny, 2])  # sigma_xy, sigma_yy, mu
     # NOTE: NOT CONSIDERING INCLINED GRAVITY
     weight_of_one_cell = p.solid_density * p.dx * p.dy * p.g
     for j in range(p.ny - 2, -1, -1):
@@ -74,10 +74,6 @@ def calculate_stress(s, last_swap, p):
                     + 0.5 * (1 - stress_fraction[i, j]) * (left_up[1] + right_up[1])
                     + 0.5 * (left_up[0] - right_up[0])
                 )
-    with np.errstate(divide="ignore", invalid="ignore"):
-        sigma[:, :, 2] = np.nan_to_num(
-            np.abs(sigma[:, :, 0]) / sigma[:, :, 1], nan=0.0, posinf=1e30, neginf=0.0
-        )
 
     # import matplotlib.pyplot as plt
 
@@ -89,3 +85,31 @@ def calculate_stress(s, last_swap, p):
     # plt.pause(1e-3)
 
     return sigma
+
+
+def get_mu(sigma):
+    with np.errstate(divide="ignore", invalid="ignore"):
+        mu = np.nan_to_num(np.abs(sigma[:, :, 0]) / sigma[:, :, 1], nan=0.0, posinf=1e30, neginf=0.0)
+    return mu
+
+
+def get_sigma_xx(sigma, p):
+    # NOTE: only implemented isotropic case
+    K = 1.0 - np.sin(np.radians(p.repose_angle))
+    sigma_xx = K * sigma[:, :, 1]
+    return sigma_xx
+
+
+def get_pressure(sigma, p):
+    sigma_xx = get_sigma_xx(sigma, p)
+    pressure = 0.5 * (sigma_xx + sigma[:, :, 1])
+    return pressure
+
+
+def get_deviatoric(sigma, p):
+    sigma_xy = sigma[:, :, 0]
+    sigma_yy = sigma[:, :, 1]
+    sigma_xx = get_sigma_xx(sigma, p)
+
+    q = np.sqrt(((sigma_yy - sigma_xx) / 2) ** 2 + sigma_xy**2)
+    return q
