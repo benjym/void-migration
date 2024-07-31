@@ -1,7 +1,7 @@
 # -*- mode: python ; coding: utf-8 -*-
 from PyInstaller.utils.hooks import collect_all
 
-datas = []
+datas = [('json/defaults.json5', 'json'), ('json/gui.json5', 'json')]
 binaries = []
 hiddenimports = ['kivymd.icon_definitions']
 tmp_ret = collect_all('void_migration')

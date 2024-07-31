@@ -18,7 +18,7 @@ jobs:
       - run: |
           choco install opengl
           $env:PATH += ";C:\tools\opengl"
-      - run: pyinstaller build.spec --distpath dist/${{ matrix.arch }}
+      - run: pyinstaller build.spec --distpath dist/windows/${{ matrix.arch }}
 
       - uses: actions/upload-artifact@v4
         with:

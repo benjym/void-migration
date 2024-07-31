@@ -15,9 +15,9 @@ jobs:
           python-version: 3.11
       - run: python -m pip install --upgrade pip
       - run: pip install -e .
-      - run: pyinstaller build.spec --distpath dist/${{ matrix.arch }}
+      - run: pyinstaller build.spec --distpath dist/macos/${{ matrix.arch }}
 
       - uses: actions/upload-artifact@v4
         with:
           name: macOS App ${{ matrix.arch }}
-          path: dist/mac/${{ matrix.arch }}/VoidMigration
+          path: dist/macos/${{ matrix.arch }}/VoidMigration
