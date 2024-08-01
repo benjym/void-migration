@@ -1,4 +1,4 @@
-# import os
+import os
 import sys
 import json5
 import numpy as np
@@ -35,7 +35,8 @@ class dict_to_class:
         print(f"Optimal condition: ny = {ny}.")
 
     def set_defaults(self):
-        with open("json/defaults.json5", "r") as f:
+        defaults_path = resource_path("json/defaults.json5")
+        with open(defaults_path, "r") as f:
             defaults_dict = json5.loads(f.read())
 
         for key in defaults_dict:
@@ -104,7 +105,7 @@ class dict_to_class:
             self.P_u_max = self.P_u_ref * (self.s_M / self.s_m)
             self.P_lr_max = self.P_lr_ref * (self.s_M / self.s_m)
 
-            if self.vectorized:
+            if self.motion_model == "d2q5_array":
                 if self.P_u_max <= 1 and self.P_lr_max <= self.P_stab:
                     safe = True
                 else:
@@ -137,3 +138,10 @@ def load_file(f):
     p = dict_to_class(dict)
     p.set_defaults()
     return dict, p
+
+
+def resource_path(relative_path):
+    """Get the absolute path to the resource, works for both development and PyInstaller bundle."""
+    if hasattr(sys, "_MEIPASS"):
+        return os.path.join(sys._MEIPASS, relative_path)
+    return os.path.join(os.path.abspath("."), relative_path)

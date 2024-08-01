@@ -52,7 +52,8 @@
 
     // parallel code
     max_workers : 4, // max number of workers to run simultaneously. Default value is actually set void_migration.py
-    vectorized : true, // should the code be vectorized (i.e. faster)
+    
+    motion_model : 'd2q5_array', // 'd2q5_slow', 'd2q5_array' or 'd2q9_slow'
 
     // diagnostics
     show_optimal_resolution : false, // should the optimal resolution be shown on the screen at runtime

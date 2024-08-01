@@ -13,15 +13,16 @@ import numpy as np
 import concurrent.futures
 from tqdm.auto import tqdm
 from itertools import product
+import importlib
 
 # from numba import jit, njit
 from void_migration import params
 from void_migration import plotter
 from void_migration import thermal
-from void_migration import motion
 from void_migration import cycles
 from void_migration import initial
 from void_migration import stress
+from void_migration import boundary
 
 # import void_migration.params as params
 # import void_migration.plotter as plotter
@@ -33,6 +34,8 @@ from void_migration import stress
 
 
 def init(p, queue=None):
+    p.move_voids = importlib.import_module(f"void_migration.motion.{p.motion_model}").move_voids
+
     plotter.set_plot_size(p)
 
     p.update_before_time_march(cycles)
@@ -77,7 +80,7 @@ def init(p, queue=None):
     state = s, u, v, c, T, p_count, p_count_s, p_count_l, non_zero_nu_time, N_swap, last_swap, sigma, outlet
 
     if len(p.save) > 0:
-        plotter.save_coordinate_system(p.x, p.y, p)
+        plotter.save_coordinate_system(p)
     plotter.update(p, state, 0, queue)
 
     return state
@@ -108,17 +111,12 @@ def time_step(
         p = cycles.charge_discharge(p, t)
         p_count[t], p_count_s[t], p_count_l[t], non_zero_nu_time[t] = cycles.save_quantities(p, s)
 
-    if p.vectorized:
-        u, v, s, c, T, N_swap, last_swap = motion.move_voids_fast(
-            u, v, s, sigma, last_swap, p, c=c, T=T, N_swap=N_swap
-        )
-    else:
-        u, v, s, c, T, N_swap = motion.move_voids(u, v, s, p, c=c, T=T, N_swap=N_swap)
+    u, v, s, c, T, N_swap, last_swap = p.move_voids(u, v, s, sigma, last_swap, p, c=c, T=T, N_swap=N_swap)
 
-    u, v, s, c, outlet = motion.add_voids(u, v, s, p, c, outlet)
+    u, v, s, c, outlet = boundary.add_voids(u, v, s, p, c, outlet)
 
     if p.close_voids:
-        u, v, s = motion.close_voids(u, v, s)
+        u, v, s = boundary.close_voids(u, v, s)
 
     if t % p.save_inc == 0:
         plotter.update(p, state, t, queue)

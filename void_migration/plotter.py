@@ -6,7 +6,7 @@ from matplotlib.colors import LinearSegmentedColormap
 import matplotlib.cm as cm
 import warnings
 from void_migration import operators
-from void_migration import motion
+from void_migration.motion import d2q5_array
 from void_migration import stress
 
 # _video_encoding = ["-c:v", "libx265", "-preset", "fast", "-crf", "28", "-tag:v", "hvc1"] # nice small file sizes
@@ -83,6 +83,18 @@ replacements = {
 
 
 def replace_strings(text, replacements):
+    """
+    Replaces substrings in a given text based on a dictionary of replacements.
+
+    Parameters:
+    - text (str): The original string in which substrings will be replaced.
+    - replacements (dict): A dictionary where keys are substrings to be replaced and values are the new substrings.
+
+    Returns:
+    - str: The modified string with all specified replacements applied.
+
+    This function iterates over the key-value pairs in the replacements dictionary. For each pair, it replaces all occurrences of the key (old substring) in the text with the corresponding value (new substring). The function returns the modified text after all replacements have been made.
+    """
     for old, new in replacements.items():
         text = text.replace(old, new)
     return text
@@ -203,15 +215,15 @@ def plot_stable(s, p, t):
     solid = np.zeros([p.nx, p.ny])
     for i in range(1, p.nx - 1):
         for j in range(p.ny):
-            slope[i, j, 0] = motion.stable_slope(s, i, j, i - 1, p)
-            slope[i, j, 1] = motion.stable_slope(s, i, j, i + 1, p)
+            slope[i, j, 0] = d2q5_array.stable_slope(s, i, j, i - 1, p)
+            slope[i, j, 1] = d2q5_array.stable_slope(s, i, j, i + 1, p)
 
     for i in range(p.nx):
         for j in range(p.ny):
-            solid[i, j] = motion.locally_solid(s, i, j, p)
+            solid[i, j] = d2q5_array.locally_solid(s, i, j, p)
 
     nu = operators.get_solid_fraction(s)
-    empty = motion.empty_nearby(nu, p)
+    empty = d2q5_array.empty_nearby(nu, p)
 
     for f in [
         [slope[:, :, 0], "slope_right"],
@@ -318,16 +330,20 @@ def plot_rel_mu(s, sigma, last_swap, p, t):
 def plot_stress(s, sigma, last_swap, p, t):
     if sigma is None:
         sigma = stress.calculate_stress(s, last_swap, p)
+    pressure = stress.get_pressure(sigma, p)
+    deviatoric = stress.get_deviatoric(sigma, p)
+    mu = stress.get_mu(sigma)
+
     plt.figure(triple_fig)
     plt.clf()
     plt.subplot(311)
     plt.pcolormesh(
         p.x,
         p.y,
-        sigma[:, :, 0].T,
+        pressure.T,
         cmap="bwr",
-        vmin=-np.amax(np.abs(sigma[:, :, 0])),
-        vmax=np.amax(np.abs(sigma[:, :, 0])),
+        vmin=0,
+        vmax=pressure.max(),
     )
     plt.axis("off")
     plt.xlim(p.x[0], p.x[-1])
@@ -335,14 +351,14 @@ def plot_stress(s, sigma, last_swap, p, t):
     # plt.colorbar()
 
     plt.subplot(312)
-    plt.pcolormesh(p.x, p.y, sigma[:, :, 1].T)
+    plt.pcolormesh(p.x, p.y, deviatoric.T)
     plt.axis("off")
     plt.xlim(p.x[0], p.x[-1])
     plt.ylim(p.y[0], p.y[-1])
     # plt.colorbar()
 
     plt.subplot(313)
-    plt.pcolormesh(p.x, p.y, sigma[:, :, 2].T, vmin=0, vmax=p.mu)
+    plt.pcolormesh(p.x, p.y, mu.T, vmin=0, vmax=p.mu)
     plt.axis("off")
     plt.xlim(p.x[0], p.x[-1])
     plt.ylim(p.y[0], p.y[-1])

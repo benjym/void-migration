@@ -1,13 +1,3 @@
-import sys
-import os
-import signal
-import multiprocessing
-from functools import partial
-
-os.environ["KIVY_NO_ARGS"] = "1"
-os.environ["KIVY_NO_CONSOLELOG"] = "1"
-
-from kivy.uix.button import Button
 from kivy.uix.image import Image
 from kivy.clock import Clock
 from kivy.core.image import Image as CoreImage
@@ -23,14 +13,22 @@ from kivymd.uix.button.button import MDRaisedButton as Button
 from kivy.cache import Cache
 from kivy.config import Config
 from kivy.logger import Logger, LOG_LEVELS
+import void_migration.params as params
+from void_migration.main import time_march
 
+
+import sys
+import os
+import signal
+import multiprocessing
+from functools import partial
+
+os.environ["KIVY_NO_ARGS"] = "1"
+os.environ["KIVY_NO_CONSOLELOG"] = "1"
 
 # Set log level to warning
 Config.set("kivy", "log_level", "warning")
 Logger.setLevel(LOG_LEVELS["warning"])
-
-import void_migration.params as params
-from void_migration.main import time_march
 
 
 def run_time_march(p, queue, stop_event, *args):
@@ -198,7 +196,7 @@ if __name__ == "__main__":
     multiprocessing.set_start_method("spawn")
     multiprocessing.freeze_support()
     if len(sys.argv) < 2:
-        filename = "json/gui.json5"
+        filename = params.resource_path("json/gui.json5")
     else:
         filename = sys.argv[1]
     with open(filename, "r") as f:

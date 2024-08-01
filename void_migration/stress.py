@@ -45,7 +45,7 @@ def calculate_stress(s, last_swap, p):
             K = K_p * (K_a / K_p) ** ((a + 1) / 2)
             stress_fraction = 1 - K
 
-    sigma = np.zeros([p.nx, p.ny, 2])  # sigma_xy, sigma_yy, mu
+    sigma = np.zeros([p.nx, p.ny, 2])  # sigma_xy, sigma_yy
     # NOTE: NOT CONSIDERING INCLINED GRAVITY
     weight_of_one_cell = p.solid_density * p.dx * p.dy * p.g
     for j in range(p.ny - 2, -1, -1):
